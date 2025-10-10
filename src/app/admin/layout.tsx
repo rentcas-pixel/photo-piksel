@@ -6,7 +6,6 @@ import {
   LogOut, 
   X
 } from 'lucide-react'
-import Image from 'next/image'
 import { useEffect, useState, createContext, useContext } from 'react'
 import { supabase } from '@/lib/supabase'
 import Toast from '@/components/Toast'
@@ -202,11 +201,9 @@ export default function AdminLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Image
+              <img
                 src="/Piksel-logo-black-2023.png"
                 alt="Piksel"
-                width={120}
-                height={40}
                 className="h-8 w-auto"
               />
             </div>
