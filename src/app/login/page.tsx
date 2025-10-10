@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { isAdmin } from '@/lib/auth-utils'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -26,16 +25,16 @@ export default function LoginPage() {
       if (error) {
         setError(error.message)
       } else {
-        // Store user in localStorage for mock mode
+        // Store user in localStorage
         if (data.user) {
           localStorage.setItem('mock-user', JSON.stringify(data.user))
         }
         
-        // Redirect admin users to admin panel, others to clients list
-        if (isAdmin(data.user?.email)) {
+        // Redirect admin users to admin panel
+        if (data.user?.email === 'admin@piksel.lt') {
           router.push('/admin')
         } else {
-          router.push('/dashboard/clients')
+          router.push('/login')
         }
       }
     } catch (err) {
