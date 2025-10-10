@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Agency } from '@/types/database'
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 
-export default function NewClientPage() {
+function NewClientForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [agencies, setAgencies] = useState<Agency[]>([])
@@ -170,5 +170,13 @@ export default function NewClientPage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function NewClientPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <NewClientForm />
+    </Suspense>
   )
 }
