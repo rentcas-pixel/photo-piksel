@@ -99,14 +99,6 @@ export default function AdminPhotosPage() {
       index === self.findIndex(c => c.id === client.id)
     )
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -210,10 +202,7 @@ export default function AdminPhotosPage() {
                 <p className="text-sm text-gray-600 truncate">
                   {photo.client?.name}
                 </p>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-xs text-gray-500">
-                    {formatFileSize(photo.file_size)}
-                  </span>
+                <div className="flex justify-end items-center mt-2">
                   <button
                     onClick={() => handleDeletePhoto(photo.id)}
                     className="text-red-600 hover:text-red-900"

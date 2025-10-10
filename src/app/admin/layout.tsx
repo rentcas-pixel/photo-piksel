@@ -168,8 +168,6 @@ export default function AdminLayout({
           client_id: uploadClientId,
           filename: fileName,
           original_name: file.name,
-          file_size: file.size,
-          mime_type: file.type,
           url: publicUrl,
         })
       }

@@ -166,8 +166,6 @@ export default function AdminClientDetailPage() {
           client_id: clientId,
           filename: fileName,
           original_name: file.name,
-          file_size: file.size,
-          mime_type: file.type,
           url: publicUrl,
         })
       }
@@ -203,14 +201,6 @@ export default function AdminClientDetailPage() {
       console.error('Error:', error)
       alert('Klaida trinant nuotrauką')
     }
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes'
-    const k = 1024
-    const sizes = ['Bytes', 'KB', 'MB', 'GB']
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
   if (loading) {
@@ -345,10 +335,7 @@ export default function AdminClientDetailPage() {
                 <h3 className="font-medium text-gray-900 truncate" title={photo.original_name}>
                   {photo.original_name}
                 </h3>
-                <div className="flex justify-between items-center mt-2">
-                  <span className="text-xs text-gray-500">
-                    {formatFileSize(photo.file_size)}
-                  </span>
+                <div className="mt-2">
                   <span className="text-xs text-gray-500">
                     {new Date(photo.created_at).toLocaleDateString('lt-LT')}
                   </span>
