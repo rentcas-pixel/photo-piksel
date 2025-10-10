@@ -123,7 +123,7 @@ export default function AdminPhotosPage() {
             Pridėti agentūrą
           </button>
           <button
-            onClick={showClientModal}
+            onClick={() => showClientModal()}
             className="inline-flex items-center px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-800 transition-colors"
           >
             <Plus className="h-4 w-4 mr-2" />
