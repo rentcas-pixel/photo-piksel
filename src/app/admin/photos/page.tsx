@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Photo, Client } from '@/types/database'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, Trash2 } from 'lucide-react'
 import { useAdminModals } from '../layout'
 
 interface PhotoWithClient extends Photo {
