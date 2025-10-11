@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabase'
 import { Client, Photo } from '@/types/database'
 import { Download, Image as ImageIcon, DownloadCloud, ChevronRight } from 'lucide-react'
 import JSZip from 'jszip'
-import Image from 'next/image'
 import Link from 'next/link'
 
 interface PhotoWithClient extends Photo {
@@ -166,11 +165,9 @@ export default function ClientPublicPage() {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
-            <Image
+            <img
               src="/Piksel-logo-black-2023.png"
               alt="Piksel"
-              width={120}
-              height={40}
               className="h-8 w-auto"
             />
           </div>

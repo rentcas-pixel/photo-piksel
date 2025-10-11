@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabase'
 import { Client } from '@/types/database'
 import Link from 'next/link'
 import { Folder, Image as ImageIcon } from 'lucide-react'
-import Image from 'next/image'
 
 interface Agency {
   id: string
@@ -115,11 +114,9 @@ export default function AgencyPublicPage() {
       <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
-            <Image
+            <img
               src="/Piksel-logo-black-2023.png"
               alt="Piksel"
-              width={120}
-              height={40}
               className="h-8 w-auto"
             />
           </div>
