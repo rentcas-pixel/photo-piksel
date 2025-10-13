@@ -23,6 +23,7 @@ export default function AdminClientDetailPage() {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoWithClient | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -85,6 +86,34 @@ export default function AdminClientDetailPage() {
       }
     } catch (error) {
       console.error('Error:', error)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+
+    const files = Array.from(e.dataTransfer.files).filter(file => 
+      file.type.startsWith('image/')
+    )
+    
+    if (files.length > 0) {
+      const dataTransfer = new DataTransfer()
+      files.forEach(file => dataTransfer.items.add(file))
+      await handleUploadPhotos(dataTransfer.files)
     }
   }
 
@@ -276,6 +305,23 @@ export default function AdminClientDetailPage() {
             )}
           </div>
         </div>
+      </div>
+
+      {/* Drag & Drop Zone */}
+      <div
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          isDragOver 
+            ? 'border-indigo-500 bg-indigo-50' 
+            : 'border-gray-300 bg-gray-50 hover:border-indigo-400'
+        }`}
+      >
+        <Upload className={`mx-auto h-8 w-8 mb-3 ${isDragOver ? 'text-indigo-500' : 'text-gray-400'}`} />
+        <p className={`text-sm ${isDragOver ? 'text-indigo-600' : 'text-gray-600'}`}>
+          Vilkite nuotraukas čia arba naudokite mygtuką viršuje
+        </p>
       </div>
 
       {/* Photos Grid */}

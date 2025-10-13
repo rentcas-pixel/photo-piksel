@@ -6,7 +6,7 @@ import {
   LogOut, 
   X
 } from 'lucide-react'
-import { useEffect, useState, createContext, useContext } from 'react'
+import { useEffect, useState, createContext, useContext, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import Toast from '@/components/Toast'
 
@@ -48,7 +48,8 @@ export default function AdminLayout({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [clients, setClients] = useState<{ id: string; name: string; agency_id: string }[]>([])
   const [uploading, setUploading] = useState(false)
-  
+  const [isDragOver, setIsDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   
@@ -146,6 +147,32 @@ export default function AdminLayout({
       showToast('Klaida kuriant klientą', 'error')
     } finally {
       setUploading(false)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragOver(false)
+
+    const files = Array.from(e.dataTransfer.files).filter(file => 
+      file.type.startsWith('image/')
+    )
+    
+    if (files.length > 0) {
+      setSelectedFiles(files)
     }
   }
 
@@ -378,15 +405,32 @@ export default function AdminLayout({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Pasirinkite nuotraukas</label>
                   <input
+                    ref={fileInputRef}
                     type="file"
                     multiple
                     accept="image/*"
                     onChange={(e) => e.target.files && setSelectedFiles(Array.from(e.target.files))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="hidden"
                   />
-                  {selectedFiles.length > 0 && (
-                    <p className="mt-2 text-sm text-gray-600">Pasirinkta failų: {selectedFiles.length}</p>
-                  )}
+                  <div
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`w-full px-4 py-8 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${
+                      isDragOver 
+                        ? 'border-indigo-500 bg-indigo-50' 
+                        : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50'
+                    }`}
+                  >
+                    <div className="text-center">
+                      <p className="text-gray-600">
+                        {selectedFiles.length > 0 
+                          ? `Pasirinkta failų: ${selectedFiles.length}` 
+                          : 'Vilkite failus čia arba paspauskite pasirinkti'}
+                      </p>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex space-x-3">
                   <button
