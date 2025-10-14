@@ -23,6 +23,7 @@ export default function AdminCampaignDetailPage() {
   const [photos, setPhotos] = useState<PhotoWithCampaign[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 })
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoWithCampaign | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -195,31 +196,79 @@ export default function AdminCampaignDetailPage() {
   const handleUploadPhotos = async (files: FileList | null) => {
     if (!files || files.length === 0) return
     
+    const filesArray = Array.from(files)
+    const totalFiles = filesArray.length
+    
     setUploading(true)
+    setUploadProgress({ current: 0, total: totalFiles })
+    
+    let successCount = 0
+    let errorCount = 0
+    
     try {
-      for (const file of Array.from(files)) {
-        const fileName = `${Date.now()}-${file.name}`
-        const { error: uploadError } = await supabase.storage.from('photos').upload(fileName, file)
-        if (uploadError) {
-          console.error('Upload error:', uploadError)
-          continue
+      // Upload files one by one to avoid timeout
+      for (let i = 0; i < filesArray.length; i++) {
+        const file = filesArray[i]
+        
+        try {
+          // Generate unique filename
+          const timestamp = Date.now()
+          const randomString = Math.random().toString(36).substring(2, 8)
+          const fileName = `${timestamp}-${randomString}-${file.name}`
+          
+          // Upload to storage
+          const { error: uploadError } = await supabase.storage
+            .from('photos')
+            .upload(fileName, file)
+          
+          if (uploadError) {
+            console.error('Upload error:', uploadError)
+            errorCount++
+            setUploadProgress({ current: i + 1, total: totalFiles })
+            continue
+          }
+          
+          // Get public URL
+          const { data: { publicUrl } } = supabase.storage
+            .from('photos')
+            .getPublicUrl(fileName)
+          
+          // Insert into database
+          const { error: dbError } = await supabase.from('photos').insert({
+            campaign_id: campaignId,
+            filename: fileName,
+            original_name: file.name,
+            url: publicUrl,
+          })
+          
+          if (dbError) {
+            console.error('Database error:', dbError)
+            errorCount++
+          } else {
+            successCount++
+          }
+        } catch (fileError) {
+          console.error('Error uploading file:', file.name, fileError)
+          errorCount++
         }
         
-        const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName)
-        await supabase.from('photos').insert({
-          campaign_id: campaignId,
-          filename: fileName,
-          original_name: file.name,
-          url: publicUrl,
-        })
+        // Update progress
+        setUploadProgress({ current: i + 1, total: totalFiles })
       }
       
+      // Show result message
+      if (errorCount > 0) {
+        alert(`Įkelta: ${successCount} nuotraukų\nKlaidos: ${errorCount} nuotraukų`)
+      }
+      
+      // Refresh photos list
       fetchPhotos()
     } catch (error) {
       console.error('Error uploading photos:', error)
       alert('Klaida įkeliant nuotraukas')
     } finally {
       setUploading(false)
+      setUploadProgress({ current: 0, total: 0 })
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -362,7 +411,11 @@ export default function AdminCampaignDetailPage() {
               className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm h-10 disabled:opacity-50"
             >
               <Upload className="h-4 w-4 mr-2" />
-              <span className="text-sm font-medium">{uploading ? 'Įkeliama...' : 'Įkelti nuotraukas'}</span>
+              <span className="text-sm font-medium">
+                {uploading 
+                  ? `Įkeliama ${uploadProgress.current}/${uploadProgress.total}...` 
+                  : 'Įkelti nuotraukas'}
+              </span>
             </button>
             
             {photos.length > 0 && (
