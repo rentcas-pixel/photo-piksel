@@ -50,7 +50,6 @@ export default function AdminClientsPage() {
 
   const fetchPhotoCounts = async () => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: photos } = await supabase
         .from('photos')
         .select(`
@@ -58,19 +57,18 @@ export default function AdminClientsPage() {
           created_at,
           campaign:campaigns(client_id)
         `)
-        .order('created_at', { ascending: false }) as { data: any[] | null }
+        .order('created_at', { ascending: false }) as { data: unknown[] | null }
 
       if (photos) {
         const counts: Record<string, number> = {}
         const lastUpdated: Record<string, string> = {}
         
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        photos.forEach((photo: any) => {
-          const clientId = photo.campaign?.client_id
+        photos.forEach((photo: unknown) => {
+          const clientId = (photo as {campaign?: {client_id?: string}})?.campaign?.client_id
           if (clientId) {
             counts[clientId] = (counts[clientId] || 0) + 1
             if (!lastUpdated[clientId]) {
-              lastUpdated[clientId] = photo.created_at
+              lastUpdated[clientId] = (photo as {created_at: string}).created_at
             }
           }
         })
