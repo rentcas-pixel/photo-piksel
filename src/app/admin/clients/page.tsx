@@ -57,13 +57,13 @@ export default function AdminClientsPage() {
           created_at,
           campaign:campaigns(client_id)
         `)
-        .order('created_at', { ascending: false })
+        .order('created_at', { ascending: false }) as { data: any[] | null }
 
       if (photos) {
         const counts: Record<string, number> = {}
         const lastUpdated: Record<string, string> = {}
         
-        photos.forEach(photo => {
+        photos.forEach((photo: any) => {
           const clientId = photo.campaign?.client_id
           if (clientId) {
             counts[clientId] = (counts[clientId] || 0) + 1
