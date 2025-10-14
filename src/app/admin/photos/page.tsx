@@ -12,10 +12,14 @@ interface PhotoWithDetails extends Photo {
   }
 }
 
+interface CampaignWithClient extends Campaign {
+  client: Client
+}
+
 export default function AdminPhotosPage() {
   const { showAgencyModal, showClientModal, showPhotoModal } = useAdminModals()
   const [photos, setPhotos] = useState<PhotoWithDetails[]>([])
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [campaigns, setCampaigns] = useState<CampaignWithClient[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCampaign, setSelectedCampaign] = useState('')
