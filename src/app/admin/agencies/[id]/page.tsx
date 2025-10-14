@@ -74,7 +74,11 @@ export default function AgencyClientsPage() {
     try {
       const { data: photos } = await supabase
         .from('photos')
-        .select('client_id, created_at')
+        .select(`
+          campaign_id,
+          created_at,
+          campaign:campaigns(client_id)
+        `)
         .order('created_at', { ascending: false })
 
       if (photos) {
@@ -82,9 +86,12 @@ export default function AgencyClientsPage() {
         const lastUpdated: Record<string, string> = {}
         
         photos.forEach(photo => {
-          counts[photo.client_id] = (counts[photo.client_id] || 0) + 1
-          if (!lastUpdated[photo.client_id]) {
-            lastUpdated[photo.client_id] = photo.created_at
+          const clientId = photo.campaign?.client_id
+          if (clientId) {
+            counts[clientId] = (counts[clientId] || 0) + 1
+            if (!lastUpdated[clientId]) {
+              lastUpdated[clientId] = photo.created_at
+            }
           }
         })
         

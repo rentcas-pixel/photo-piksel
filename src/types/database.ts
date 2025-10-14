@@ -14,9 +14,18 @@ export interface Client {
   updated_at: string
 }
 
-export interface Photo {
+export interface Campaign {
   id: string
   client_id: string
+  name: string
+  description?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface Photo {
+  id: string
+  campaign_id: string
   filename: string
   original_name: string
   url: string
@@ -36,6 +45,11 @@ export interface Database {
         Row: Client
         Insert: Omit<Client, 'id' | 'created_at' | 'updated_at'>
         Update: Partial<Omit<Client, 'id' | 'created_at' | 'updated_at'>>
+      }
+      campaigns: {
+        Row: Campaign
+        Insert: Omit<Campaign, 'id' | 'created_at' | 'updated_at'>
+        Update: Partial<Omit<Campaign, 'id' | 'created_at' | 'updated_at'>>
       }
       photos: {
         Row: Photo

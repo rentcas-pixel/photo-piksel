@@ -24,10 +24,20 @@ CREATE TABLE IF NOT EXISTS clients (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Create photos table (directly linked to clients)
-CREATE TABLE IF NOT EXISTS photos (
+-- Create campaigns table (projects/campaigns under clients)
+CREATE TABLE IF NOT EXISTS campaigns (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   client_id UUID REFERENCES clients(id) ON DELETE CASCADE,
+  name VARCHAR(255) NOT NULL,
+  description TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create photos table (linked to campaigns)
+CREATE TABLE IF NOT EXISTS photos (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  campaign_id UUID REFERENCES campaigns(id) ON DELETE CASCADE,
   filename VARCHAR(255) NOT NULL,
   original_name VARCHAR(255) NOT NULL,
   file_size BIGINT NOT NULL,
@@ -50,6 +60,7 @@ $$ language 'plpgsql';
 -- Drop existing triggers if they exist
 DROP TRIGGER IF EXISTS update_agencies_updated_at ON agencies;
 DROP TRIGGER IF EXISTS update_clients_updated_at ON clients;
+DROP TRIGGER IF EXISTS update_campaigns_updated_at ON campaigns;
 DROP TRIGGER IF EXISTS update_photos_updated_at ON photos;
 
 -- Create triggers
@@ -59,12 +70,16 @@ CREATE TRIGGER update_agencies_updated_at BEFORE UPDATE ON agencies
 CREATE TRIGGER update_clients_updated_at BEFORE UPDATE ON clients
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_campaigns_updated_at BEFORE UPDATE ON campaigns
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 CREATE TRIGGER update_photos_updated_at BEFORE UPDATE ON photos
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Enable Row Level Security
 ALTER TABLE agencies ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE photos ENABLE ROW LEVEL SECURITY;
 
 -- Drop existing policies
@@ -145,11 +160,35 @@ CREATE POLICY "Agencies can delete their own clients" ON clients
     )
   );
 
--- Photos policies - Agency sees only photos of their clients (READ-ONLY for agencies)
-CREATE POLICY "Agencies can view photos of their clients" ON photos
+-- Campaigns policies - Agency sees only campaigns of their clients
+CREATE POLICY "Agencies can view campaigns of their clients" ON campaigns
   FOR SELECT USING (
     client_id IN (
       SELECT c.id FROM clients c
+      JOIN agencies a ON c.agency_id = a.id
+      WHERE a.user_id = auth.uid()
+    )
+  );
+
+-- Admin policies for campaigns
+CREATE POLICY "Admins can insert campaigns" ON campaigns
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+
+CREATE POLICY "Admins can view all campaigns" ON campaigns
+  FOR SELECT USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+
+CREATE POLICY "Admins can update all campaigns" ON campaigns
+  FOR UPDATE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+
+CREATE POLICY "Admins can delete all campaigns" ON campaigns
+  FOR DELETE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+
+-- Photos policies - Agency sees only photos of their campaigns (READ-ONLY for agencies)
+CREATE POLICY "Agencies can view photos of their campaigns" ON photos
+  FOR SELECT USING (
+    campaign_id IN (
+      SELECT cam.id FROM campaigns cam
+      JOIN clients c ON cam.client_id = c.id
       JOIN agencies a ON c.agency_id = a.id
       WHERE a.user_id = auth.uid()
     )

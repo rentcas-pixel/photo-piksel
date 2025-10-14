@@ -2,25 +2,27 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Photo, Client } from '@/types/database'
+import { Photo, Campaign, Client } from '@/types/database'
 import { Plus, Search, Trash2 } from 'lucide-react'
 import { useAdminModals } from '../layout'
 
-interface PhotoWithClient extends Photo {
-  client: Client
+interface PhotoWithDetails extends Photo {
+  campaign: Campaign & {
+    client: Client
+  }
 }
 
 export default function AdminPhotosPage() {
   const { showAgencyModal, showClientModal, showPhotoModal } = useAdminModals()
-  const [photos, setPhotos] = useState<PhotoWithClient[]>([])
-  const [clients, setClients] = useState<Client[]>([])
+  const [photos, setPhotos] = useState<PhotoWithDetails[]>([])
+  const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [selectedClient, setSelectedClient] = useState('')
+  const [selectedCampaign, setSelectedCampaign] = useState('')
 
   useEffect(() => {
     fetchPhotos()
-    fetchClients()
+    fetchCampaigns()
   }, [])
 
   const fetchPhotos = async () => {
@@ -29,7 +31,10 @@ export default function AdminPhotosPage() {
         .from('photos')
         .select(`
           *,
-          client:clients(*)
+          campaign:campaigns(
+            *,
+            client:clients(*)
+          )
         `)
         .order('created_at', { ascending: false })
 
@@ -45,17 +50,20 @@ export default function AdminPhotosPage() {
     }
   }
 
-  const fetchClients = async () => {
+  const fetchCampaigns = async () => {
     try {
       const { data, error } = await supabase
-        .from('clients')
-        .select('*')
+        .from('campaigns')
+        .select(`
+          *,
+          client:clients(*)
+        `)
         .order('name', { ascending: true })
 
       if (error) {
-        console.error('Error fetching clients:', error)
+        console.error('Error fetching campaigns:', error)
       } else {
-        setClients(data || [])
+        setCampaigns(data || [])
       }
     } catch (error) {
       console.error('Error:', error)
@@ -86,18 +94,11 @@ export default function AdminPhotosPage() {
 
   const filteredPhotos = photos.filter(photo => {
     const matchesSearch = photo.original_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         photo.client?.name.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesClient = !selectedClient || photo.client_id === selectedClient
-    return matchesSearch && matchesClient
+                         photo.campaign?.client?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         photo.campaign?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesCampaign = !selectedCampaign || photo.campaign_id === selectedCampaign
+    return matchesSearch && matchesCampaign
   })
-
-  // Get unique clients for filter
-  const uniqueClients = photos
-    .map(photo => photo.client)
-    .filter(Boolean)
-    .filter((client, index, self) => 
-      index === self.findIndex(c => c.id === client.id)
-    )
 
   if (loading) {
     return (
@@ -112,7 +113,7 @@ export default function AdminPhotosPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Nuotraukų valdymas</h1>
-          <p className="text-gray-600">Įkelkite ir valdykite visų klientų nuotraukas</p>
+          <p className="text-gray-600">Įkelkite ir valdykite visų kampanijų nuotraukas</p>
         </div>
         <div className="flex gap-3">
           <button
@@ -153,14 +154,14 @@ export default function AdminPhotosPage() {
             />
           </div>
           <select
-            value={selectedClient}
-            onChange={(e) => setSelectedClient(e.target.value)}
+            value={selectedCampaign}
+            onChange={(e) => setSelectedCampaign(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           >
-            <option value="">Visi klientai</option>
-            {uniqueClients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.name}
+            <option value="">Visos kampanijos</option>
+            {campaigns.map((campaign) => (
+              <option key={campaign.id} value={campaign.id}>
+                {campaign.client?.name} / {campaign.name}
               </option>
             ))}
           </select>
@@ -199,8 +200,8 @@ export default function AdminPhotosPage() {
                 <h3 className="font-medium text-gray-900 truncate" title={photo.original_name}>
                   {photo.original_name}
                 </h3>
-                <p className="text-sm text-gray-600 truncate">
-                  {photo.client?.name}
+                <p className="text-sm text-gray-600 truncate" title={`${photo.campaign?.client?.name} / ${photo.campaign?.name}`}>
+                  {photo.campaign?.client?.name} / {photo.campaign?.name}
                 </p>
                 <div className="flex justify-end items-center mt-2">
                   <button

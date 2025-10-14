@@ -44,9 +44,10 @@ export default function AdminLayout({
   const [preselectedAgency, setPreselectedAgency] = useState<string | null>(null)
   const [agencies, setAgencies] = useState<{ id: string; name: string }[]>([])
   
-  const [uploadClientId, setUploadClientId] = useState('')
+  const [uploadCampaignId, setUploadCampaignId] = useState('')
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [clients, setClients] = useState<{ id: string; name: string; agency_id: string }[]>([])
+  const [campaigns, setCampaigns] = useState<Array<{ id: string; name: string; client: { name: string } }>>([])
   const [uploading, setUploading] = useState(false)
   const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -69,6 +70,7 @@ export default function AdminLayout({
     }
     fetchAgencies()
     fetchClients()
+    fetchCampaigns()
   }, [user, router])
   
   const fetchAgencies = async () => {
@@ -79,6 +81,14 @@ export default function AdminLayout({
   const fetchClients = async () => {
     const { data } = await supabase.from('clients').select('*').order('name', { ascending: true })
     setClients(data || [])
+  }
+
+  const fetchCampaigns = async () => {
+    const { data } = await supabase
+      .from('campaigns')
+      .select('*, client:clients(name)')
+      .order('name', { ascending: true })
+    setCampaigns(data || [])
   }
   
   const generateSlug = (name: string) => {
@@ -177,8 +187,8 @@ export default function AdminLayout({
   }
 
   const handleUploadPhotos = async () => {
-    if (!uploadClientId || selectedFiles.length === 0) {
-      showToast('Pasirinkite klientą ir nuotraukas', 'error')
+    if (!uploadCampaignId || selectedFiles.length === 0) {
+      showToast('Pasirinkite kampaniją ir nuotraukas', 'error')
       return
     }
     
@@ -191,7 +201,7 @@ export default function AdminLayout({
         
         const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName)
         await supabase.from('photos').insert({
-          client_id: uploadClientId,
+          campaign_id: uploadCampaignId,
           filename: fileName,
           original_name: file.name,
           url: publicUrl,
@@ -201,7 +211,7 @@ export default function AdminLayout({
       showToast('Nuotraukos sėkmingai įkeltos!')
       setShowPhotoModal(false)
       setSelectedFiles([])
-      setUploadClientId('')
+      setUploadCampaignId('')
       router.refresh()
     } catch (error) {
       showToast('Klaida įkeliant nuotraukas', 'error')
@@ -383,22 +393,24 @@ export default function AdminLayout({
                 <button onClick={() => {
                   setShowPhotoModal(false)
                   setSelectedFiles([])
-                  setUploadClientId('')
+                  setUploadCampaignId('')
                 }} className="text-gray-400 hover:text-gray-600">
                   <X className="h-6 w-6" />
                 </button>
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Pasirinkite klientą</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Pasirinkite kampaniją</label>
                   <select
-                    value={uploadClientId}
-                    onChange={(e) => setUploadClientId(e.target.value)}
+                    value={uploadCampaignId}
+                    onChange={(e) => setUploadCampaignId(e.target.value)}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   >
-                    <option value="">Pasirinkite klientą...</option>
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>{client.name}</option>
+                    <option value="">Pasirinkite kampaniją...</option>
+                    {campaigns.map((campaign) => (
+                      <option key={campaign.id} value={campaign.id}>
+                        {campaign.client?.name} / {campaign.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -444,7 +456,7 @@ export default function AdminLayout({
                     onClick={() => {
                       setShowPhotoModal(false)
                       setSelectedFiles([])
-                      setUploadClientId('')
+                      setUploadCampaignId('')
                     }}
                     className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
                   >
