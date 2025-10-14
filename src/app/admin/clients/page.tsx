@@ -50,6 +50,7 @@ export default function AdminClientsPage() {
 
   const fetchPhotoCounts = async () => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const { data: photos } = await supabase
         .from('photos')
         .select(`
@@ -63,6 +64,7 @@ export default function AdminClientsPage() {
         const counts: Record<string, number> = {}
         const lastUpdated: Record<string, string> = {}
         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         photos.forEach((photo: any) => {
           const clientId = photo.campaign?.client_id
           if (clientId) {
