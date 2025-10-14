@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Campaign, Client, Photo } from '@/types/database'
-import { Download, Image as ImageIcon, DownloadCloud, Trash2, ChevronRight, Upload, X, Plus } from 'lucide-react'
+import { Download, Image as ImageIcon, DownloadCloud, Trash2, ChevronRight, Upload, X, Plus, Edit } from 'lucide-react'
 import JSZip from 'jszip'
 import Link from 'next/link'
 
@@ -25,6 +25,9 @@ export default function AdminCampaignDetailPage() {
   const [uploading, setUploading] = useState(false)
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoWithCampaign | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -244,6 +247,44 @@ export default function AdminCampaignDetailPage() {
     }
   }
 
+  const handleEditClick = () => {
+    if (campaign) {
+      setEditName(campaign.name)
+      setEditDescription(campaign.description || '')
+      setShowEditModal(true)
+    }
+  }
+
+  const handleUpdateCampaign = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!editName.trim()) {
+      alert('Įveskite kampanijos pavadinimą')
+      return
+    }
+
+    try {
+      const { error } = await supabase
+        .from('campaigns')
+        .update({
+          name: editName.trim(),
+          description: editDescription.trim() || null,
+        })
+        .eq('id', campaignId)
+
+      if (error) {
+        console.error('Error updating campaign:', error)
+        alert('Klaida atnaujinant kampaniją')
+      } else {
+        setShowEditModal(false)
+        fetchCampaign()
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      alert('Klaida atnaujinant kampaniją')
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -284,11 +325,20 @@ export default function AdminCampaignDetailPage() {
       {/* Header */}
       <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
         <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{campaign.name}</h1>
-            {campaign.description && (
-              <p className="text-gray-600 mt-1">{campaign.description}</p>
-            )}
+          <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">{campaign.name}</h1>
+              {campaign.description && (
+                <p className="text-gray-600 mt-1">{campaign.description}</p>
+              )}
+            </div>
+            <button
+              onClick={handleEditClick}
+              className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+              title="Redaguoti kampaniją"
+            >
+              <Edit className="h-5 w-5" />
+            </button>
           </div>
           
           <div className="flex items-center gap-4">
@@ -440,6 +490,63 @@ export default function AdminCampaignDetailPage() {
               alt={selectedPhoto.original_name}
               className="max-w-full max-h-full object-contain rounded-lg"
             />
+          </div>
+        </div>
+      )}
+
+      {/* Edit Campaign Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Redaguoti kampaniją</h2>
+            
+            <form onSubmit={handleUpdateCampaign} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Kampanijos pavadinimas *
+                </label>
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  required
+                  autoFocus
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Aprašymas (neprivaloma)
+                </label>
+                <textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false)
+                    setEditName('')
+                    setEditDescription('')
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Atšaukti
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                >
+                  Išsaugoti
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
