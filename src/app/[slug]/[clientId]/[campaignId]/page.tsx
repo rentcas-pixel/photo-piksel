@@ -36,6 +36,12 @@ export default function CampaignPublicPage() {
   useEffect(() => {
     if (slug && clientId && campaignId) {
       fetchData()
+      
+      // Update last visit date when page is opened
+      const lastVisitsKey = `last_visits_${clientId}`
+      const lastVisits = JSON.parse(localStorage.getItem(lastVisitsKey) || '{}')
+      lastVisits[campaignId] = new Date().toISOString()
+      localStorage.setItem(lastVisitsKey, JSON.stringify(lastVisits))
     }
   }, [slug, clientId, campaignId])
 
@@ -49,29 +55,29 @@ export default function CampaignPublicPage() {
 
     const lastVisitsKey = `last_visits_${clientId}`
     const lastVisits = JSON.parse(localStorage.getItem(lastVisitsKey) || '{}')
-    const lastVisit = lastVisits[campaignId]
+    let lastVisit = lastVisits[campaignId]
 
-    if (lastVisit) {
-      const newIds = new Set<string>()
-      photos.forEach(photo => {
-        const photoDate = new Date(photo.created_at)
-        const visitDate = new Date(lastVisit)
-        // Photo is new if it was created after last visit AND hasn't been viewed yet
-        if (photoDate > visitDate && !viewedSet.has(photo.id)) {
-          newIds.add(photo.id)
-        }
-      })
-      setNewPhotoIds(newIds)
-    } else {
-      // If first visit, all photos that haven't been viewed are new
-      const newIds = new Set<string>()
-      photos.forEach(photo => {
-        if (!viewedSet.has(photo.id)) {
-          newIds.add(photo.id)
-        }
-      })
-      setNewPhotoIds(newIds)
+    // If first visit, set baseline to today (so no old photos show as NEW)
+    if (!lastVisit) {
+      lastVisit = new Date().toISOString()
+      lastVisits[campaignId] = lastVisit
+      localStorage.setItem(lastVisitsKey, JSON.stringify(lastVisits))
     }
+
+    const newIds = new Set<string>()
+    const visitDate = new Date(lastVisit)
+    
+    photos.forEach(photo => {
+      const photoDate = new Date(photo.created_at)
+      // Photo is new ONLY if:
+      // 1. It was created after last visit
+      // 2. It hasn't been viewed yet
+      if (photoDate > visitDate && !viewedSet.has(photo.id)) {
+        newIds.add(photo.id)
+      }
+    })
+    
+    setNewPhotoIds(newIds)
   }, [photos, clientId, campaignId])
 
   // Helper function to mark photo as viewed

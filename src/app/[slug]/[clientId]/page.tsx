@@ -87,14 +87,25 @@ export default function ClientPublicPage() {
         // Get last visit dates from localStorage
         const lastVisitsKey = `last_visits_${clientId}`
         const lastVisits = JSON.parse(localStorage.getItem(lastVisitsKey) || '{}')
+        const today = new Date().toISOString()
         
         photos.forEach(photo => {
           counts[photo.campaign_id] = (counts[photo.campaign_id] || 0) + 1
           
-          // Check if photo is new (created after last visit) AND not viewed yet
-          const lastVisit = lastVisits[photo.campaign_id]
+          // Get or set baseline date for this campaign
+          let lastVisit = lastVisits[photo.campaign_id]
+          if (!lastVisit) {
+            // First visit - set baseline to today (so no old photos show as NEW)
+            lastVisit = today
+            lastVisits[photo.campaign_id] = lastVisit
+            localStorage.setItem(lastVisitsKey, JSON.stringify(lastVisits))
+          }
+          
           const photoDate = new Date(photo.created_at)
-          const isNewByDate = !lastVisit || new Date(lastVisit) < photoDate
+          const visitDate = new Date(lastVisit)
+          
+          // Photo is new ONLY if created after last visit AND not viewed yet
+          const isNewByDate = photoDate > visitDate
           
           // Check if photo has been viewed
           const viewedPhotosKey = `viewed_photos_${clientId}_${photo.campaign_id}`
