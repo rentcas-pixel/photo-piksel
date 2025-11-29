@@ -24,6 +24,7 @@ export default function ClientPublicPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [campaignPhotoCounts, setCampaignPhotoCounts] = useState<Record<string, number>>({})
+  const [newPhotosCount, setNewPhotosCount] = useState<Record<string, number>>({})
 
   useEffect(() => {
     if (slug && clientId) {
@@ -73,17 +74,41 @@ export default function ClientPublicPage() {
         setCampaigns(campaignsData || [])
       }
 
-      // Fetch photo counts
+      // Fetch photo counts and new photos
       const { data: photos } = await supabase
         .from('photos')
-        .select('campaign_id')
+        .select('id, campaign_id, created_at')
+        .order('created_at', { ascending: false })
 
       if (photos) {
         const counts: Record<string, number> = {}
+        const newCounts: Record<string, number> = {}
+        
+        // Get last visit dates from localStorage
+        const lastVisitsKey = `last_visits_${clientId}`
+        const lastVisits = JSON.parse(localStorage.getItem(lastVisitsKey) || '{}')
+        
         photos.forEach(photo => {
           counts[photo.campaign_id] = (counts[photo.campaign_id] || 0) + 1
+          
+          // Check if photo is new (created after last visit) AND not viewed yet
+          const lastVisit = lastVisits[photo.campaign_id]
+          const photoDate = new Date(photo.created_at)
+          const isNewByDate = !lastVisit || new Date(lastVisit) < photoDate
+          
+          // Check if photo has been viewed
+          const viewedPhotosKey = `viewed_photos_${clientId}_${photo.campaign_id}`
+          const viewedPhotos = JSON.parse(localStorage.getItem(viewedPhotosKey) || '[]')
+          const isViewed = viewedPhotos.includes(photo.id)
+          
+          // Photo is new if it's new by date AND not viewed yet
+          if (isNewByDate && !isViewed) {
+            newCounts[photo.campaign_id] = (newCounts[photo.campaign_id] || 0) + 1
+          }
         })
+        
         setCampaignPhotoCounts(counts)
+        setNewPhotosCount(newCounts)
       }
     } catch (error) {
       console.error('Error:', error)
@@ -162,9 +187,16 @@ export default function ClientPublicPage() {
                         {campaign.description}
                       </p>
                     )}
-                    <div className="flex items-center justify-center text-sm text-gray-600">
-                      <ImageIcon className="h-4 w-4 mr-1" />
-                      <span>{campaignPhotoCounts[campaign.id] || 0}</span>
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center text-sm text-gray-600">
+                        <ImageIcon className="h-4 w-4 mr-1" />
+                        <span>{campaignPhotoCounts[campaign.id] || 0}</span>
+                      </div>
+                      {newPhotosCount[campaign.id] > 0 && (
+                        <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5 min-w-[20px] text-center">
+                          {newPhotosCount[campaign.id]}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>

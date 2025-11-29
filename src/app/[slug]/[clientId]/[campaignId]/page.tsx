@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Client, Campaign, Photo } from '@/types/database'
-import { Download, Image as ImageIcon, DownloadCloud, ChevronRight, X } from 'lucide-react'
+import { Download, Image as ImageIcon, DownloadCloud, ChevronRight, X, ChevronLeft } from 'lucide-react'
 import JSZip from 'jszip'
 import Link from 'next/link'
 
@@ -31,12 +31,104 @@ export default function CampaignPublicPage() {
   const [photos, setPhotos] = useState<PhotoWithCampaign[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoWithCampaign | null>(null)
+  const [newPhotoIds, setNewPhotoIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (slug && clientId && campaignId) {
       fetchData()
     }
   }, [slug, clientId, campaignId])
+
+  // Identify new photos after photos are loaded
+  useEffect(() => {
+    if (photos.length === 0) return
+
+    const viewedPhotosKey = `viewed_photos_${clientId}_${campaignId}`
+    const viewedPhotos = JSON.parse(localStorage.getItem(viewedPhotosKey) || '[]')
+    const viewedSet = new Set(viewedPhotos)
+
+    const lastVisitsKey = `last_visits_${clientId}`
+    const lastVisits = JSON.parse(localStorage.getItem(lastVisitsKey) || '{}')
+    const lastVisit = lastVisits[campaignId]
+
+    if (lastVisit) {
+      const newIds = new Set<string>()
+      photos.forEach(photo => {
+        const photoDate = new Date(photo.created_at)
+        const visitDate = new Date(lastVisit)
+        // Photo is new if it was created after last visit AND hasn't been viewed yet
+        if (photoDate > visitDate && !viewedSet.has(photo.id)) {
+          newIds.add(photo.id)
+        }
+      })
+      setNewPhotoIds(newIds)
+    } else {
+      // If first visit, all photos that haven't been viewed are new
+      const newIds = new Set<string>()
+      photos.forEach(photo => {
+        if (!viewedSet.has(photo.id)) {
+          newIds.add(photo.id)
+        }
+      })
+      setNewPhotoIds(newIds)
+    }
+  }, [photos, clientId, campaignId])
+
+  const navigateToPrevious = () => {
+    if (!selectedPhoto || photos.length === 0) return
+    
+    const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
+    if (currentIndex > 0) {
+      setSelectedPhoto(photos[currentIndex - 1])
+    } else {
+      // Loop to last photo
+      setSelectedPhoto(photos[photos.length - 1])
+    }
+  }
+
+  const navigateToNext = () => {
+    if (!selectedPhoto || photos.length === 0) return
+    
+    const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
+    if (currentIndex < photos.length - 1) {
+      setSelectedPhoto(photos[currentIndex + 1])
+    } else {
+      // Loop to first photo
+      setSelectedPhoto(photos[0])
+    }
+  }
+
+  // Keyboard navigation for photo modal
+  useEffect(() => {
+    if (!selectedPhoto) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setSelectedPhoto(null)
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        if (!selectedPhoto || photos.length === 0) return
+        const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
+        if (currentIndex > 0) {
+          setSelectedPhoto(photos[currentIndex - 1])
+        } else {
+          setSelectedPhoto(photos[photos.length - 1])
+        }
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        if (!selectedPhoto || photos.length === 0) return
+        const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
+        if (currentIndex < photos.length - 1) {
+          setSelectedPhoto(photos[currentIndex + 1])
+        } else {
+          setSelectedPhoto(photos[0])
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [selectedPhoto, photos])
 
   const fetchData = async () => {
     try {
@@ -253,13 +345,36 @@ export default function CampaignPublicPage() {
                 <div 
                   className="relative bg-gray-100" 
                   style={{ aspectRatio: '3/2' }}
-                  onClick={() => setSelectedPhoto(photo)}
+                  onClick={() => {
+                    setSelectedPhoto(photo)
+                    // Mark photo as viewed when opened
+                    const viewedPhotosKey = `viewed_photos_${clientId}_${campaignId}`
+                    const viewedPhotos = JSON.parse(localStorage.getItem(viewedPhotosKey) || '[]')
+                    if (!viewedPhotos.includes(photo.id)) {
+                      viewedPhotos.push(photo.id)
+                      localStorage.setItem(viewedPhotosKey, JSON.stringify(viewedPhotos))
+                      // Remove from new photos set
+                      setNewPhotoIds(prev => {
+                        const newSet = new Set(prev)
+                        newSet.delete(photo.id)
+                        return newSet
+                      })
+                    }
+                  }}
                 >
                   <img
                     src={photo.url}
                     alt={photo.original_name}
                     className="w-full h-full object-cover"
                   />
+                  {/* New photo badge */}
+                  {newPhotoIds.has(photo.id) && (
+                    <div className="absolute top-2 left-2">
+                      <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">
+                        NEW
+                      </span>
+                    </div>
+                  )}
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => {
@@ -295,25 +410,65 @@ export default function CampaignPublicPage() {
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedPhoto(null)}
         >
-          <div className="relative max-w-7xl max-h-full" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-w-7xl max-h-full w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+            {/* Navigation buttons */}
+            {photos.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigateToPrevious()
+                  }}
+                  className="absolute left-4 p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors z-10 shadow-lg"
+                  title="Ankstesnė nuotrauka (←)"
+                >
+                  <ChevronLeft className="h-5 w-5 text-white stroke-2" />
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    navigateToNext()
+                  }}
+                  className="absolute right-4 p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors z-10 shadow-lg"
+                  title="Kita nuotrauka (→)"
+                >
+                  <ChevronRight className="h-5 w-5 text-white stroke-2" />
+                </button>
+              </>
+            )}
+            
+            {/* Top right buttons */}
             <div className="absolute top-4 right-4 flex gap-2 z-10">
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   handleDownload(selectedPhoto)
                 }}
-                className="p-3 bg-green-500 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
+                className="p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors shadow-lg"
                 title="Atsisiųsti nuotrauką"
               >
-                <Download className="h-6 w-6 text-white" />
+                <Download className="h-5 w-5 text-white stroke-2" />
               </button>
               <button
                 onClick={() => setSelectedPhoto(null)}
-                className="p-3 bg-red-500 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
+                className="p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors shadow-lg"
+                title="Uždaryti (ESC)"
               >
-                <X className="h-6 w-6 text-white" />
+                <X className="h-5 w-5 text-white stroke-2" />
               </button>
             </div>
+
+            {/* Photo counter */}
+            {photos.length > 1 && (
+              <div className="absolute top-4 left-4 z-10">
+                <div className="px-4 py-2 bg-black bg-opacity-50 rounded-lg">
+                  <p className="text-white text-sm font-medium">
+                    {photos.findIndex(p => p.id === selectedPhoto.id) + 1} / {photos.length}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <img
               src={selectedPhoto.url}
               alt={selectedPhoto.original_name}
