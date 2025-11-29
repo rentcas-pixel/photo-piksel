@@ -74,29 +74,60 @@ export default function CampaignPublicPage() {
     }
   }, [photos, clientId, campaignId])
 
+  // Helper function to mark photo as viewed
+  const markPhotoAsViewed = (photoId: string) => {
+    const viewedPhotosKey = `viewed_photos_${clientId}_${campaignId}`
+    const viewedPhotos = JSON.parse(localStorage.getItem(viewedPhotosKey) || '[]')
+    if (!viewedPhotos.includes(photoId)) {
+      viewedPhotos.push(photoId)
+      localStorage.setItem(viewedPhotosKey, JSON.stringify(viewedPhotos))
+      // Remove from new photos set
+      setNewPhotoIds(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(photoId)
+        return newSet
+      })
+    }
+  }
+
   const navigateToPrevious = () => {
     if (!selectedPhoto || photos.length === 0) return
     
+    // Mark current photo as viewed before navigating
+    markPhotoAsViewed(selectedPhoto.id)
+    
     const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
-    if (currentIndex > 0) {
-      setSelectedPhoto(photos[currentIndex - 1])
-    } else {
-      // Loop to last photo
-      setSelectedPhoto(photos[photos.length - 1])
-    }
+    const nextPhoto = currentIndex > 0 
+      ? photos[currentIndex - 1]
+      : photos[photos.length - 1]
+    
+    setSelectedPhoto(nextPhoto)
+    // Mark new photo as viewed
+    markPhotoAsViewed(nextPhoto.id)
   }
 
   const navigateToNext = () => {
     if (!selectedPhoto || photos.length === 0) return
     
+    // Mark current photo as viewed before navigating
+    markPhotoAsViewed(selectedPhoto.id)
+    
     const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
-    if (currentIndex < photos.length - 1) {
-      setSelectedPhoto(photos[currentIndex + 1])
-    } else {
-      // Loop to first photo
-      setSelectedPhoto(photos[0])
-    }
+    const nextPhoto = currentIndex < photos.length - 1
+      ? photos[currentIndex + 1]
+      : photos[0]
+    
+    setSelectedPhoto(nextPhoto)
+    // Mark new photo as viewed
+    markPhotoAsViewed(nextPhoto.id)
   }
+
+  // Mark photo as viewed when it's opened in lightbox
+  useEffect(() => {
+    if (selectedPhoto) {
+      markPhotoAsViewed(selectedPhoto.id)
+    }
+  }, [selectedPhoto])
 
   // Keyboard navigation for photo modal
   useEffect(() => {
@@ -107,22 +138,10 @@ export default function CampaignPublicPage() {
         setSelectedPhoto(null)
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault()
-        if (!selectedPhoto || photos.length === 0) return
-        const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
-        if (currentIndex > 0) {
-          setSelectedPhoto(photos[currentIndex - 1])
-        } else {
-          setSelectedPhoto(photos[photos.length - 1])
-        }
+        navigateToPrevious()
       } else if (e.key === 'ArrowRight') {
         e.preventDefault()
-        if (!selectedPhoto || photos.length === 0) return
-        const currentIndex = photos.findIndex(p => p.id === selectedPhoto.id)
-        if (currentIndex < photos.length - 1) {
-          setSelectedPhoto(photos[currentIndex + 1])
-        } else {
-          setSelectedPhoto(photos[0])
-        }
+        navigateToNext()
       }
     }
 
@@ -199,6 +218,9 @@ export default function CampaignPublicPage() {
 
   const handleDownload = async (photo: PhotoWithCampaign) => {
     try {
+      // Mark photo as viewed when downloading
+      markPhotoAsViewed(photo.id)
+      
       const extension = photo.original_name.split('.').pop() || 'jpg'
       const uploadDate = new Date(photo.created_at).toISOString().split('T')[0]
       const newFilename = `Piksel_${client?.name}_${campaign?.name}_${uploadDate}.${extension}`
@@ -225,6 +247,9 @@ export default function CampaignPublicPage() {
     if (photos.length === 0) return
     
     try {
+      // Mark all photos as viewed when downloading all
+      photos.forEach(photo => markPhotoAsViewed(photo.id))
+      
       const zip = new JSZip()
       
       for (let i = 0; i < photos.length; i++) {
@@ -348,18 +373,7 @@ export default function CampaignPublicPage() {
                   onClick={() => {
                     setSelectedPhoto(photo)
                     // Mark photo as viewed when opened
-                    const viewedPhotosKey = `viewed_photos_${clientId}_${campaignId}`
-                    const viewedPhotos = JSON.parse(localStorage.getItem(viewedPhotosKey) || '[]')
-                    if (!viewedPhotos.includes(photo.id)) {
-                      viewedPhotos.push(photo.id)
-                      localStorage.setItem(viewedPhotosKey, JSON.stringify(viewedPhotos))
-                      // Remove from new photos set
-                      setNewPhotoIds(prev => {
-                        const newSet = new Set(prev)
-                        newSet.delete(photo.id)
-                        return newSet
-                      })
-                    }
+                    markPhotoAsViewed(photo.id)
                   }}
                 >
                   <img
