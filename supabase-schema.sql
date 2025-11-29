@@ -107,16 +107,16 @@ CREATE POLICY "Users can update their own agency" ON agencies
 
 -- Admin policies for agencies
 CREATE POLICY "Admins can insert agencies" ON agencies
-  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can view all agencies" ON agencies
-  FOR SELECT USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR SELECT USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can update all agencies" ON agencies
-  FOR UPDATE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR UPDATE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can delete all agencies" ON agencies
-  FOR DELETE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR DELETE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 -- Clients policies - Agency sees only their clients
 CREATE POLICY "Agencies can view their own clients" ON clients
@@ -142,16 +142,16 @@ CREATE POLICY "Agencies can update their own clients" ON clients
 
 -- Admin policies for clients
 CREATE POLICY "Admins can insert clients" ON clients
-  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can view all clients" ON clients
-  FOR SELECT USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR SELECT USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can update all clients" ON clients
-  FOR UPDATE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR UPDATE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can delete all clients" ON clients
-  FOR DELETE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR DELETE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Agencies can delete their own clients" ON clients
   FOR DELETE USING (
@@ -172,16 +172,16 @@ CREATE POLICY "Agencies can view campaigns of their clients" ON campaigns
 
 -- Admin policies for campaigns
 CREATE POLICY "Admins can insert campaigns" ON campaigns
-  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can view all campaigns" ON campaigns
-  FOR SELECT USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR SELECT USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can update all campaigns" ON campaigns
-  FOR UPDATE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR UPDATE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can delete all campaigns" ON campaigns
-  FOR DELETE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR DELETE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 -- Photos policies - Agency sees only photos of their campaigns (READ-ONLY for agencies)
 CREATE POLICY "Agencies can view photos of their campaigns" ON photos

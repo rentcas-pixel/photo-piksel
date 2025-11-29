@@ -13,33 +13,70 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log('Form submitted, email:', email)
     setLoading(true)
     setError('')
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      console.log('Attempting to sign in...')
+      console.log('Supabase client:', supabase ? 'exists' : 'missing')
+      console.log('Email:', email)
+      console.log('Password length:', password.length)
+      
+      const signInPromise = supabase.auth.signInWithPassword({
         email,
         password,
       })
+      
+      console.log('Sign in promise created, waiting for response...')
+      
+      const { data, error } = await signInPromise
+
+      console.log('Sign in response received!')
+      console.log('Data:', data)
+      console.log('Error:', error)
 
       if (error) {
-        setError(error.message)
-      } else {
-        // Store user in localStorage
-        if (data.user) {
-          localStorage.setItem('mock-user', JSON.stringify(data.user))
-        }
-        
-        // Redirect admin users to admin panel
-        if (data.user?.email === 'admin@piksel.lt') {
-          router.push('/admin')
+        console.error('Login error:', error)
+        // More specific error messages
+        if (error.message.includes('Invalid login credentials')) {
+          setError('Neteisingas el. paštas arba slaptažodis')
+        } else if (error.message.includes('Email not confirmed')) {
+          setError('El. paštas nepatvirtintas. Patikrinkite savo el. paštą arba susisiekite su administratoriumi.')
         } else {
-          router.push('/login')
+          setError(error.message || 'Klaida prisijungiant')
         }
+        setLoading(false)
+        return
+      }
+
+      if (!data || !data.user) {
+        console.error('No user data returned')
+        setError('Nepavyko gauti vartotojo duomenų')
+        setLoading(false)
+        return
+      }
+
+      // Store user in localStorage
+      console.log('Storing user in localStorage:', data.user.email)
+      localStorage.setItem('mock-user', JSON.stringify(data.user))
+      
+      // Redirect admin users to admin panel
+      const adminEmails = ['admin@piksel.lt', 'renatas@piksel.lt']
+      console.log('Checking if user is admin. Email:', data.user.email, 'Admin emails:', adminEmails)
+      
+      if (data.user.email && adminEmails.includes(data.user.email)) {
+        console.log('User is admin, redirecting to /admin')
+        // Use window.location for more reliable redirect
+        window.location.href = '/admin'
+      } else {
+        console.log('User is not admin, showing error')
+        setError('Jūs neturite administratoriaus teisių')
+        setLoading(false)
       }
     } catch (err) {
-      setError('Įvyko klaida prisijungiant')
-    } finally {
+      console.error('Unexpected error:', err)
+      setError('Įvyko klaida prisijungiant: ' + (err instanceof Error ? err.message : 'Nežinoma klaida'))
       setLoading(false)
     }
   }

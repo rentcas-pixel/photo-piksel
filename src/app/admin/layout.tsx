@@ -64,13 +64,18 @@ export default function AdminLayout({
   }
 
   useEffect(() => {
-    // Check if user is admin (admin@piksel.lt)
-    if (user && user.email !== 'admin@piksel.lt') {
+    // Check if user is admin (admin@piksel.lt or renatas@piksel.lt)
+    const adminEmails = ['admin@piksel.lt', 'renatas@piksel.lt']
+    console.log('Admin layout - Current user:', user?.email)
+    if (user && !adminEmails.includes(user.email || '')) {
+      console.log('User is not admin, redirecting to login')
       router.push('/login')
+    } else if (user && adminEmails.includes(user.email || '')) {
+      console.log('User is admin, fetching data')
+      fetchAgencies()
+      fetchClients()
+      fetchCampaigns()
     }
-    fetchAgencies()
-    fetchClients()
-    fetchCampaigns()
   }, [user, router])
   
   const fetchAgencies = async () => {
@@ -193,34 +198,58 @@ export default function AdminLayout({
     }
     
     setUploading(true)
+    let successCount = 0
+    let errorCount = 0
+    
     try {
       for (const file of selectedFiles) {
-        const fileName = `${Date.now()}-${file.name}`
-        const { error: uploadError } = await supabase.storage.from('photos').upload(fileName, file)
-        if (uploadError) continue
-        
-        const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName)
-        await supabase.from('photos').insert({
-          campaign_id: uploadCampaignId,
-          filename: fileName,
-          original_name: file.name,
-          url: publicUrl,
-        })
+        try {
+          // Use API route with Service Role Key (bypasses RLS)
+          const formData = new FormData()
+          formData.append('file', file)
+          formData.append('campaignId', uploadCampaignId)
+          
+          const response = await fetch('/api/upload-photo', {
+            method: 'POST',
+            body: formData,
+          })
+          
+          const result = await response.json()
+          
+          if (!response.ok) {
+            console.error('Upload error:', result.error)
+            showToast(`Klaida įkeliant ${file.name}: ${result.error}`, 'error')
+            errorCount++
+            continue
+          }
+          
+          successCount++
+        } catch (fileError) {
+          console.error('Error uploading file:', file.name, fileError)
+          showToast(`Klaida įkeliant ${file.name}`, 'error')
+          errorCount++
+        }
       }
       
-      showToast('Nuotraukos sėkmingai įkeltos!')
-      setShowPhotoModal(false)
-      setSelectedFiles([])
-      setUploadCampaignId('')
-      router.refresh()
+      if (successCount > 0) {
+        showToast(`Sėkmingai įkelta ${successCount} nuotraukų${errorCount > 0 ? ` (${errorCount} klaidų)` : ''}`)
+        setShowPhotoModal(false)
+        setSelectedFiles([])
+        setUploadCampaignId('')
+        router.refresh()
+      } else {
+        showToast('Nepavyko įkelti nė vienos nuotraukos. Patikrinkite, ar pridėjote SUPABASE_SERVICE_ROLE_KEY į .env.local', 'error')
+      }
     } catch (error) {
-      showToast('Klaida įkeliant nuotraukas', 'error')
+      console.error('Upload error:', error)
+      showToast('Klaida įkeliant nuotraukas: ' + (error instanceof Error ? error.message : 'Nežinoma klaida'), 'error')
     } finally {
       setUploading(false)
     }
   }
 
-  if (user && user.email !== 'admin@piksel.lt') {
+  const adminEmails = ['admin@piksel.lt', 'renatas@piksel.lt']
+  if (user && !adminEmails.includes(user.email || '')) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
