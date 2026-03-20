@@ -308,7 +308,7 @@ export default function CampaignPublicPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
             <img
-              src="/Piksel-logo-black-2023.png"
+              src="/Piksel-logo-juodas-2026.png"
               alt="Piksel"
               className="h-8 w-auto"
             />
@@ -444,8 +444,18 @@ export default function CampaignPublicPage() {
           className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedPhoto(null)}
         >
+          <div
+            className="absolute top-[30px] left-[30px] z-[60]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src="/Piksel-logo-baltas-2026.png"
+              alt="Piksel"
+              className="h-8 w-auto drop-shadow-md"
+            />
+          </div>
           <div className="relative max-w-7xl max-h-full w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-            {/* Navigation buttons */}
+            {/* Navigation buttons (šalia „dėžės“, ne ant pačios nuotraukos krašto) */}
             {photos.length > 1 && (
               <>
                 <button
@@ -453,7 +463,7 @@ export default function CampaignPublicPage() {
                     e.stopPropagation()
                     navigateToPrevious()
                   }}
-                  className="absolute left-4 p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors z-10 shadow-lg"
+                  className="absolute left-0 sm:left-2 md:left-4 top-1/2 -translate-y-1/2 p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors z-10 shadow-lg"
                   title="Ankstesnė nuotrauka (←)"
                 >
                   <ChevronLeft className="h-5 w-5 text-white stroke-2" />
@@ -463,51 +473,56 @@ export default function CampaignPublicPage() {
                     e.stopPropagation()
                     navigateToNext()
                   }}
-                  className="absolute right-4 p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors z-10 shadow-lg"
+                  className="absolute right-0 sm:right-2 md:right-4 top-1/2 -translate-y-1/2 p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors z-10 shadow-lg"
                   title="Kita nuotrauka (→)"
                 >
                   <ChevronRight className="h-5 w-5 text-white stroke-2" />
                 </button>
               </>
             )}
-            
-            {/* Top right buttons */}
-            <div className="absolute top-4 right-4 flex gap-2 z-10">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleDownload(selectedPhoto)
-                }}
-                className="p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors shadow-lg"
-                title="Atsisiųsti nuotrauką"
-              >
-                <Download className="h-5 w-5 text-white stroke-2" />
-              </button>
-              <button
-                onClick={() => setSelectedPhoto(null)}
-                className="p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors shadow-lg"
-                title="Uždaryti (ESC)"
-              >
-                <X className="h-5 w-5 text-white stroke-2" />
-              </button>
-            </div>
 
-            {/* Photo counter */}
-            {photos.length > 1 && (
-              <div className="absolute top-4 left-4 z-10">
-                <div className="px-4 py-2 bg-black bg-opacity-50 rounded-lg">
-                  <p className="text-white text-sm font-medium">
-                    {photos.findIndex(p => p.id === selectedPhoto.id) + 1} / {photos.length}
-                  </p>
+            {/* Konteineris sutampa su nuotraukos matmenimis — skaitiklis ir mygtukai ant foto; logotipas virš juodo fono */}
+            <div className="relative inline-block max-h-[min(85vh,calc(100vh-4rem))] max-w-full">
+              <img
+                src={selectedPhoto.url}
+                alt={selectedPhoto.original_name}
+                className="block max-h-[min(85vh,calc(100vh-4rem))] max-w-full w-auto h-auto object-contain rounded-lg"
+              />
+
+              {photos.length > 1 && (
+                <div
+                  className="absolute top-3 left-3 z-[60]"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="px-3 py-1.5 bg-black rounded-lg">
+                    <p className="text-white text-sm font-medium">
+                      {photos.findIndex((p) => p.id === selectedPhoto.id) + 1} /{' '}
+                      {photos.length}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <img
-              src={selectedPhoto.url}
-              alt={selectedPhoto.original_name}
-              className="max-w-full max-h-full object-contain rounded-lg"
-            />
+              <div className="absolute top-3 right-3 flex gap-2 z-[60]" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDownload(selectedPhoto)
+                  }}
+                  className="p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors shadow-lg"
+                  title="Atsisiųsti nuotrauką"
+                >
+                  <Download className="h-5 w-5 text-white stroke-2" />
+                </button>
+                <button
+                  onClick={() => setSelectedPhoto(null)}
+                  className="p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors shadow-lg"
+                  title="Uždaryti (ESC)"
+                >
+                  <X className="h-5 w-5 text-white stroke-2" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

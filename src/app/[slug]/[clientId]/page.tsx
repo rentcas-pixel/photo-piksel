@@ -188,7 +188,7 @@ export default function ClientPublicPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center">
             <img
-              src="/Piksel-logo-black-2023.png"
+              src="/Piksel-logo-juodas-2026.png"
               alt="Piksel"
               className="h-8 w-auto"
             />

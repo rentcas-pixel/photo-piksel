@@ -268,7 +268,7 @@ export default function AdminLayout({
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <img
-                src="/Piksel-logo-black-2023.png"
+                src="/Piksel-logo-juodas-2026.png"
                 alt="Piksel"
                 className="h-8 w-auto"
               />

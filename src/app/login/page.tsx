@@ -89,7 +89,7 @@ export default function LoginPage() {
           <div>
             <div className="flex justify-center mb-8">
               <img
-                src="/Piksel-logo-black-2023.png"
+                src="/Piksel-logo-juodas-2026.png"
                 alt="Piksel"
                 className="h-16 w-auto"
               />
