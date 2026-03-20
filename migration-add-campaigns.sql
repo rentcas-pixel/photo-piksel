@@ -31,16 +31,16 @@ CREATE POLICY "Agencies can view campaigns of their clients" ON campaigns
   );
 
 CREATE POLICY "Admins can insert campaigns" ON campaigns
-  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can view all campaigns" ON campaigns
-  FOR SELECT USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR SELECT USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can update all campaigns" ON campaigns
-  FOR UPDATE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR UPDATE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 CREATE POLICY "Admins can delete all campaigns" ON campaigns
-  FOR DELETE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt'));
+  FOR DELETE USING (auth.jwt() ->> 'email' IN ('admin@piksel.lt', 'renatas@piksel.lt'));
 
 -- Step 5: Create default campaign for each existing client
 INSERT INTO campaigns (client_id, name, description)
