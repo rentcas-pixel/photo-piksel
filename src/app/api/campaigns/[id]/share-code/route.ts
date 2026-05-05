@@ -26,9 +26,22 @@ export async function POST(
       )
     }
 
-    if (!supabaseUrl || !supabaseAnonKey || !serviceKey) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json(
-        { error: 'Serverio konfigūracijos klaida.' },
+        {
+          error:
+            'Trūksta NEXT_PUBLIC_SUPABASE_URL arba NEXT_PUBLIC_SUPABASE_ANON_KEY Vercel aplinkoje.',
+        },
+        { status: 500 }
+      )
+    }
+
+    if (!serviceKey || serviceKey === 'placeholder-service-key') {
+      return NextResponse.json(
+        {
+          error:
+            'Trūksta SUPABASE_SERVICE_ROLE_KEY Vercel: Project → Settings → Environment Variables → pridėkite rakta iš Supabase (Settings → API), perdeploy.',
+        },
         { status: 500 }
       )
     }
