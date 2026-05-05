@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { ADMIN_EMAILS, isAdminEmail } from '@/lib/admin'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -62,10 +63,9 @@ export default function LoginPage() {
       localStorage.setItem('mock-user', JSON.stringify(data.user))
       
       // Redirect admin users to admin panel
-      const adminEmails = ['admin@piksel.lt', 'renatas@piksel.lt']
-      console.log('Checking if user is admin. Email:', data.user.email, 'Admin emails:', adminEmails)
+      console.log('Checking if user is admin. Email:', data.user.email, 'Admin emails:', ADMIN_EMAILS)
       
-      if (data.user.email && adminEmails.includes(data.user.email)) {
+      if (isAdminEmail(data.user.email)) {
         console.log('User is admin, redirecting to /admin')
         // Use window.location for more reliable redirect
         window.location.href = '/admin'

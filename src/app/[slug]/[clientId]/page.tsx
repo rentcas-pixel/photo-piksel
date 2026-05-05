@@ -208,7 +208,7 @@ export default function ClientPublicPage() {
 
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex-1 min-h-0">
-            {/* Campaigns Grid */}
+            {/* Kampanijų sąrašas */}
             {campaigns.length === 0 ? (
               <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
                 <div className="text-gray-300 mb-6">
@@ -220,77 +220,76 @@ export default function ClientPublicPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                {sortedCampaigns.map((campaign) => {
-                  const activityIso = campaignActivityIso(campaign, campaignLastPhotoAt)
-                  const activityTs = campaignActivityTime(campaign, campaignLastPhotoAt)
-                  const isNewest =
-                    peakCampaignActivity > 0 && activityTs === peakCampaignActivity
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                <ul className="divide-y divide-gray-100">
+                  {sortedCampaigns.map((campaign) => {
+                    const activityIso = campaignActivityIso(campaign, campaignLastPhotoAt)
+                    const activityTs = campaignActivityTime(campaign, campaignLastPhotoAt)
+                    const isNewest =
+                      peakCampaignActivity > 0 && activityTs === peakCampaignActivity
 
-                  return (
-                    <Link
-                      key={campaign.id}
-                      href={`/${slug}/${clientId}/${campaign.id}`}
-                      className="group relative"
-                    >
-                      {isNewest && (
-                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 z-10 whitespace-nowrap rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm">
-                          Naujausia
-                        </span>
-                      )}
-                      <div
-                        className={`bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6 border hover:border-indigo-200 h-full ${
-                          isNewest
-                            ? 'border-indigo-300 ring-1 ring-indigo-100'
-                            : 'border-gray-100'
-                        }`}
-                      >
-                        <div className="flex flex-col items-center text-center">
-                          <div className="w-16 h-16 mb-3">
-                            <img
-                              src="/Folder.png"
-                              alt="Kampanija"
-                              className="w-full h-full"
-                            />
-                          </div>
-                          <h3 className="font-medium text-gray-900 group-hover:text-indigo-600 transition-colors mb-2 line-clamp-2">
-                            {campaign.name}
-                          </h3>
-                          {campaign.description && (
-                            <p className="text-xs text-gray-500 mb-2 line-clamp-2">
-                              {campaign.description}
-                            </p>
-                          )}
-                          <div className="flex items-center justify-center gap-2 mb-2">
-                            <div className="flex items-center text-sm text-gray-600">
-                              <ImageIcon className="h-4 w-4 mr-1 shrink-0" />
-                              <span>{campaignPhotoCounts[campaign.id] || 0}</span>
+                    return (
+                      <li key={campaign.id}>
+                        <Link
+                          href={`/${slug}/${clientId}/${campaign.id}`}
+                          className={`flex items-center gap-4 px-5 py-4 min-w-0 transition-colors group hover:bg-gray-50/90 ${
+                            isNewest ? 'bg-indigo-50/40 ring-inset ring-1 ring-indigo-100' : ''
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex flex-wrap items-center gap-2 gap-y-1">
+                              {isNewest && (
+                                <span className="shrink-0 rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                                  Naujausia
+                                </span>
+                              )}
+                              <p className="font-semibold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
+                                {campaign.name}
+                              </p>
                             </div>
-                            {newPhotosCount[campaign.id] > 0 && (
-                              <span className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5 min-w-[20px] text-center">
-                                {newPhotosCount[campaign.id]}
+                            {campaign.description ? (
+                              <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">
+                                {campaign.description}
+                              </p>
+                            ) : null}
+                            <div
+                              className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600"
+                              title={new Date(activityIso).toLocaleString('lt-LT')}
+                            >
+                              <span className="inline-flex items-center gap-2">
+                                <span className="inline-flex items-center gap-1.5 tabular-nums">
+                                  <ImageIcon className="h-4 w-4 text-gray-400 shrink-0" aria-hidden />
+                                  {campaignPhotoCounts[campaign.id] || 0}
+                                </span>
+                                {newPhotosCount[campaign.id] > 0 && (
+                                  <span
+                                    className="bg-red-500 text-white text-xs font-bold rounded-full px-2 py-0.5 min-w-[20px] text-center"
+                                    title="Naujų nuotraukų šioje kampanijoje"
+                                  >
+                                    {newPhotosCount[campaign.id]}
+                                  </span>
+                                )}
                               </span>
-                            )}
+                              <span className="inline-flex items-start gap-1.5">
+                                <Clock className="h-4 w-4 mt-0.5 shrink-0 text-gray-400" aria-hidden />
+                                <span>
+                                  <span className="text-gray-500">Paskutinis atnaujinimas </span>
+                                  <span className="font-medium text-gray-800">
+                                    {formatActivityPrimary(activityIso)}
+                                  </span>
+                                </span>
+                              </span>
+                            </div>
                           </div>
-                          <div
-                            className="flex items-start gap-1 text-xs text-gray-600 w-full justify-center"
-                            title={new Date(activityIso).toLocaleString('lt-LT')}
-                          >
-                            <Clock className="h-3.5 w-3.5 mt-0.5 shrink-0 text-gray-400" />
-                            <span className="text-left leading-snug">
-                              <span className="text-gray-500 block">
-                                Paskutinis atnaujinimas
-                              </span>
-                              <span className="font-medium text-gray-800">
-                                {formatActivityPrimary(activityIso)}
-                              </span>
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </Link>
-                  )
-                })}
+                          <ChevronRight
+                            className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 shrink-0 transition-colors"
+                            aria-hidden
+                          />
+                        </Link>
+                      </li>
+                    )
+                  })}
+                </ul>
               </div>
             )}
           </div>

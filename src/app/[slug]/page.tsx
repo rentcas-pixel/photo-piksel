@@ -162,7 +162,7 @@ export default function AgencyPublicPage() {
 
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex-1 min-h-0">
-            {/* Clients Grid */}
+            {/* Klientų thumb tinklelis */}
             {clients.length === 0 ? (
               <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
                 <div className="text-gray-300 mb-6">

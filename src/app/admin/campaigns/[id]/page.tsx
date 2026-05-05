@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Campaign, Client, Photo } from '@/types/database'
-import { Download, Image as ImageIcon, DownloadCloud, Trash2, ChevronRight, Upload, X, Plus, Edit } from 'lucide-react'
+import { Download, Image as ImageIcon, DownloadCloud, Trash2, ChevronRight, Upload, X, Plus, Edit, Copy, Check } from 'lucide-react'
 import JSZip from 'jszip'
 import Link from 'next/link'
 
@@ -19,7 +19,9 @@ export default function AdminCampaignDetailPage() {
   
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [client, setClient] = useState<Client | null>(null)
-  const [agency, setAgency] = useState<{ id: string; name: string } | null>(null)
+  const [agency, setAgency] = useState<{ id: string; name: string; unique_slug: string } | null>(null)
+  const [clientShareUrl, setClientShareUrl] = useState('')
+  const [copiedShareLink, setCopiedShareLink] = useState(false)
   const [photos, setPhotos] = useState<PhotoWithCampaign[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
@@ -37,6 +39,23 @@ export default function AdminCampaignDetailPage() {
       fetchPhotos()
     }
   }, [campaignId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !agency?.unique_slug || !client?.id || !campaign?.id) {
+      setClientShareUrl('')
+      return
+    }
+    setClientShareUrl(
+      `${window.location.origin}/${agency.unique_slug}/${client.id}/${campaign.id}`
+    )
+  }, [agency, client, campaign])
+
+  const copyClientShareLink = () => {
+    if (!clientShareUrl) return
+    navigator.clipboard.writeText(clientShareUrl)
+    setCopiedShareLink(true)
+    setTimeout(() => setCopiedShareLink(false), 2000)
+  }
 
   const fetchCampaign = async () => {
     try {
@@ -396,6 +415,27 @@ export default function AdminCampaignDetailPage() {
                 {photos.length} {photos.length === 1 ? 'nuotrauka' : 'nuotraukos'}
               </p>
             </div>
+
+            {clientShareUrl && (
+              <button
+                type="button"
+                onClick={copyClientShareLink}
+                title="Vieša nuoroda klientui (be prisijungimo)"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-800 rounded-lg hover:bg-gray-50 transition-colors shadow-sm h-10"
+              >
+                {copiedShareLink ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2 text-green-600" />
+                    <span className="text-sm font-medium">Nukopijuota</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    <span className="text-sm font-medium">Kopijuoti</span>
+                  </>
+                )}
+              </button>
+            )}
             
             <input
               ref={fileInputRef}

@@ -153,15 +153,18 @@ export default function AgencyClientsPage() {
 
       {/* Agency Header */}
       {agency && (
-        <div className="bg-white p-6 rounded-lg shadow-sm border">
-          <div className="flex justify-between items-center gap-4">
-            <div className="flex items-center gap-4 flex-1">
-              <h1 className="text-2xl font-bold text-gray-900">{agency.name}</h1>
-              <div className="relative max-w-md flex-1">
+        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+          <div className="flex justify-between items-center gap-4 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-end gap-4 flex-1 min-w-0">
+              <div className="shrink-0">
+                <h1 className="text-2xl font-bold text-gray-900">{agency.name}</h1>
+                <p className="text-gray-600 mt-1 text-sm">Klientų katalogai</p>
+              </div>
+              <div className="relative max-w-md flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Ieškoti..."
+                  placeholder="Ieškoti klientų..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -214,7 +217,7 @@ export default function AgencyClientsPage() {
       )}
 
       {filteredClients.length === 0 ? (
-        <div className="bg-white p-12 rounded-lg shadow-sm border text-center">
+        <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
           <div className="text-gray-300 mb-6">
             <Square className="mx-auto h-16 w-16" />
           </div>
@@ -226,47 +229,45 @@ export default function AgencyClientsPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {filteredClients.map((client) => (
-            <div key={client.id} className="group relative">
-              <Link
-                href={`/admin/clients/${client.id}`}
-                className="block"
-              >
-                <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-all duration-200 p-6 border border-gray-100 hover:border-indigo-200">
-                  <div className="flex flex-col items-center text-center">
-                    <div className="w-16 h-16 mb-3">
-                      <img src="/Folder.png" alt="Katalogas" className="w-full h-full" />
-                    </div>
-                    <h3 className="font-medium text-gray-900 group-hover:text-indigo-600 transition-colors mb-2">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          <ul className="divide-y divide-gray-100">
+            {filteredClients.map((client) => (
+              <li key={client.id} className="flex items-stretch hover:bg-gray-50/90 transition-colors group">
+                <Link
+                  href={`/admin/clients/${client.id}`}
+                  className="flex flex-1 items-center gap-4 px-5 py-4 min-w-0"
+                >
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="font-semibold text-gray-900 truncate" title={client.name}>
                       {client.name}
-                    </h3>
-                    <div className="flex items-center justify-center text-sm text-gray-600 mb-1">
-                      <ImageIcon className="h-4 w-4 mr-1" />
-                      <span>{clientPhotoCounts[client.id] || 0}</span>
-                    </div>
-                    {clientLastUpdated[client.id] && (
-                      <p className="text-xs text-gray-500">
+                    </p>
+                    {clientLastUpdated[client.id] ? (
+                      <p className="text-sm text-gray-500 mt-0.5">
+                        Paskutinis atnaujinimas:{' '}
                         {new Date(clientLastUpdated[client.id]).toLocaleDateString('lt-LT')}
                       </p>
+                    ) : (
+                      <p className="text-sm text-gray-400 mt-0.5">Dar nėra nuotraukų</p>
                     )}
                   </div>
-                </div>
-              </Link>
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="flex items-center gap-1.5 text-sm text-gray-600 tabular-nums shrink-0">
+                    <ImageIcon className="h-4 w-4 text-gray-400" aria-hidden />
+                    {clientPhotoCounts[client.id] || 0}
+                  </span>
+                  <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 shrink-0 transition-colors" aria-hidden />
+                </Link>
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteClient(client.id)
-                  }}
-                  className="p-2 bg-white text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-lg"
+                  type="button"
+                  onClick={() => handleDeleteClient(client.id)}
+                  className="shrink-0 px-4 flex items-center border-l border-gray-100 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                   title="Ištrinti klientą"
+                  aria-label="Ištrinti klientą"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
-              </div>
-            </div>
-          ))}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>

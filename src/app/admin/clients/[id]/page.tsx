@@ -104,23 +104,37 @@ export default function AdminClientDetailPage() {
     if (!newCampaignName.trim()) return
 
     try {
-      const { error } = await supabase
-        .from('campaigns')
-        .insert({
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        alert('Sesija pasibaigė. Prisijunkite iš naujo.')
+        return
+      }
+
+      const res = await fetch('/api/campaigns', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
           client_id: clientId,
           name: newCampaignName.trim(),
           description: newCampaignDescription.trim() || null,
-        })
+        }),
+      })
 
-      if (error) {
-        console.error('Error creating campaign:', error)
-        alert('Klaida kuriant kampaniją')
-      } else {
-        setNewCampaignName('')
-        setNewCampaignDescription('')
-        setShowAddModal(false)
-        fetchCampaigns()
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        console.error('Error creating campaign:', json)
+        alert((json as { error?: string }).error || 'Klaida kuriant kampaniją')
+        return
       }
+
+      setNewCampaignName('')
+      setNewCampaignDescription('')
+      setShowAddModal(false)
+      fetchCampaigns()
     } catch (error) {
       console.error('Error:', error)
       alert('Klaida kuriant kampaniją')
@@ -187,7 +201,7 @@ export default function AdminClientDetailPage() {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{client.name}</h1>
-            <p className="text-gray-600 mt-1">Kampanijų valdymas</p>
+            <p className="text-gray-600 mt-1">Reklamos kampanijos</p>
           </div>
           
           <div className="flex items-center gap-4">
@@ -208,7 +222,7 @@ export default function AdminClientDetailPage() {
         </div>
       </div>
 
-      {/* Campaigns Grid */}
+      {/* Campaigns — sąrašas */}
       {campaigns.length === 0 ? (
         <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
           <div className="text-gray-300 mb-6">
@@ -227,42 +241,42 @@ export default function AdminClientDetailPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {campaigns.map((campaign) => (
-            <div key={campaign.id} className="group relative">
-              <Link href={`/admin/campaigns/${campaign.id}`}>
-                <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6 text-center cursor-pointer border border-gray-100 hover:border-indigo-300">
-                  <div className="mb-4">
-                    <Folder className="mx-auto h-16 w-16 text-indigo-500 group-hover:text-indigo-600 transition-colors" strokeWidth={1.5} />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-2 truncate" title={campaign.name}>
-                    {campaign.name}
-                  </h3>
-                  {campaign.description && (
-                    <p className="text-xs text-gray-500 truncate mb-2" title={campaign.description}>
-                      {campaign.description}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+          <ul className="divide-y divide-gray-100">
+            {campaigns.map((campaign) => (
+              <li key={campaign.id} className="flex items-stretch hover:bg-gray-50/90 transition-colors group">
+                <Link
+                  href={`/admin/campaigns/${campaign.id}`}
+                  className="flex flex-1 items-center gap-4 px-5 py-4 min-w-0"
+                >
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="font-semibold text-gray-900 truncate" title={campaign.name}>
+                      {campaign.name}
                     </p>
-                  )}
-                  <div className="flex items-center justify-center text-sm text-gray-600">
-                    <ImageIcon className="h-4 w-4 mr-1" />
-                    <span>{campaignPhotoCounts[campaign.id] || 0}</span>
+                    {campaign.description ? (
+                      <p className="text-sm text-gray-500 truncate mt-0.5" title={campaign.description}>
+                        {campaign.description}
+                      </p>
+                    ) : null}
                   </div>
-                </div>
-              </Link>
-              
-              {/* Delete button */}
-              <button
-                onClick={(e) => {
-                  e.preventDefault()
-                  handleDeleteCampaign(campaign.id)
-                }}
-                className="absolute top-2 right-2 p-2 bg-red-500 text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-lg hover:bg-red-600"
-                title="Ištrinti kampaniją"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          ))}
+                  <span className="flex items-center gap-1.5 text-sm text-gray-600 tabular-nums shrink-0">
+                    <ImageIcon className="h-4 w-4 text-gray-400" aria-hidden />
+                    {campaignPhotoCounts[campaign.id] || 0}
+                  </span>
+                  <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 shrink-0 transition-colors" aria-hidden />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCampaign(campaign.id)}
+                  className="shrink-0 px-4 flex items-center border-l border-gray-100 text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                  title="Ištrinti kampaniją"
+                  aria-label="Ištrinti kampaniją"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
