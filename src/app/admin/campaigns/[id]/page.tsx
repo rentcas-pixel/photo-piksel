@@ -41,20 +41,64 @@ export default function AdminCampaignDetailPage() {
   }, [campaignId])
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !agency?.unique_slug || !client?.id || !campaign?.id) {
+    if (typeof window === 'undefined' || !campaign?.id) {
       setClientShareUrl('')
       return
     }
-    setClientShareUrl(
-      `${window.location.origin}/${agency.unique_slug}/${client.id}/${campaign.id}`
-    )
+    const origin = window.location.origin
+    if (campaign.share_code) {
+      setClientShareUrl(`${origin}/p/${campaign.share_code}`)
+      return
+    }
+    if (agency?.unique_slug && client?.id) {
+      setClientShareUrl(`${origin}/${agency.unique_slug}/${client.id}/${campaign.id}`)
+      return
+    }
+    setClientShareUrl('')
   }, [agency, client, campaign])
 
-  const copyClientShareLink = () => {
-    if (!clientShareUrl) return
-    navigator.clipboard.writeText(clientShareUrl)
-    setCopiedShareLink(true)
-    setTimeout(() => setCopiedShareLink(false), 2000)
+  const copyClientShareLink = async () => {
+    if (!campaign) return
+
+    const copyUrl = (url: string) => {
+      navigator.clipboard.writeText(url)
+      setCopiedShareLink(true)
+      setTimeout(() => setCopiedShareLink(false), 2000)
+    }
+
+    const origin =
+      typeof window !== 'undefined' ? window.location.origin : ''
+
+    if (campaign.share_code) {
+      copyUrl(`${origin}/p/${campaign.share_code}`)
+      return
+    }
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) {
+      alert('Sesija pasibaigė. Prisijunkite iš naujo.')
+      return
+    }
+
+    const res = await fetch(`/api/campaigns/${campaign.id}/share-code`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const json = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      alert((json as { error?: string }).error || 'Nepavyko sugeneruoti trumpos nuorodos')
+      return
+    }
+
+    const code = (json as { share_code?: string }).share_code
+    if (!code) {
+      alert('Nepavyko sugeneruoti trumpos nuorodos')
+      return
+    }
+
+    setCampaign((prev) => (prev ? { ...prev, share_code: code } : null))
+    copyUrl(`${origin}/p/${code}`)
   }
 
   const fetchCampaign = async () => {
@@ -419,8 +463,8 @@ export default function AdminCampaignDetailPage() {
             {clientShareUrl && (
               <button
                 type="button"
-                onClick={copyClientShareLink}
-                title="Vieša nuoroda klientui (be prisijungimo)"
+                onClick={() => void copyClientShareLink()}
+                title="Trumpa nuoroda el. laiškui: /p/… klientą nukreips į galeriją (be admin prisijungimo)."
                 className="inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-800 rounded-lg hover:bg-gray-50 transition-colors shadow-sm h-10"
               >
                 {copiedShareLink ? (

@@ -19,6 +19,8 @@ export interface Campaign {
   client_id: string
   name: string
   description?: string
+  /** Trumpa vieša nuoroda: /p/{share_code} */
+  share_code?: string | null
   created_at: string
   updated_at: string
 }

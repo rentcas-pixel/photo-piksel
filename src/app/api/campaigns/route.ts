@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { isAdminEmail } from '@/lib/admin'
+import { allocateUniqueShareCode } from '@/lib/share-code'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -61,14 +62,25 @@ export async function POST(request: NextRequest) {
       auth: { persistSession: false, autoRefreshToken: false },
     })
 
+    let share_code: string
+    try {
+      share_code = await allocateUniqueShareCode(admin)
+    } catch {
+      return NextResponse.json(
+        { error: 'Nepavyko sugeneruoti trumpos nuorodos kodo.' },
+        { status: 500 }
+      )
+    }
+
     const { data, error } = await admin
       .from('campaigns')
       .insert({
         client_id,
         name,
         description,
+        share_code,
       })
-      .select('id')
+      .select('id, share_code')
       .single()
 
     if (error) {
@@ -79,7 +91,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({ id: data.id })
+    return NextResponse.json({
+      id: data.id,
+      share_code: (data as { share_code?: string }).share_code ?? share_code,
+    })
   } catch (e) {
     console.error('POST /api/campaigns:', e)
     return NextResponse.json({ error: 'Serverio klaida.' }, { status: 500 })
