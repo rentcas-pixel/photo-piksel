@@ -464,7 +464,7 @@ export default function AdminCampaignDetailPage() {
               <button
                 type="button"
                 onClick={() => void copyClientShareLink()}
-                title="Trumpa nuoroda el. laiškui: /p/… klientą nukreips į galeriją (be admin prisijungimo)."
+                title="Trumpa nuoroda el. laiškui: /p/… — pirmiausia brand cover, tada galerija (be admin prisijungimo)."
                 className="inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-gray-800 rounded-lg hover:bg-gray-50 transition-colors shadow-sm h-10"
               >
                 {copiedShareLink ? (

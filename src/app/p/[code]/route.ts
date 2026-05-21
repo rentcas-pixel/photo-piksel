@@ -69,6 +69,6 @@ export async function GET(
     return new NextResponse('Nerasta', { status: 404 })
   }
 
-  const target = new URL(`/${slug}/${row.client_id}/${row.id}`, request.url)
+  const target = new URL(`/${slug}/${row.client_id}/${row.id}/cover`, request.url)
   return NextResponse.redirect(target, 302)
 }
