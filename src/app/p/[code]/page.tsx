@@ -1,73 +1,33 @@
-'use client'
-
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { notFound } from 'next/navigation'
 import { CampaignCoverView } from '@/components/CampaignCoverView'
+import { formatUploadedDate } from '@/lib/resolve-share-code'
 import {
-  formatUploadedDate,
-  getCampaignPhotoStats,
-  resolveShareCode,
-} from '@/lib/resolve-share-code'
+  getCampaignPhotoStatsServer,
+  resolveShareCodeServer,
+} from '@/lib/resolve-share-code-server'
 
-export default function ShareLinkCoverPage() {
-  const params = useParams()
-  const router = useRouter()
-  const code = (params.code as string) || ''
+export const dynamic = 'force-dynamic'
 
-  const [loading, setLoading] = useState(true)
-  const [resolved, setResolved] = useState<{
-    slug: string
-    clientId: string
-    campaignId: string
-    name: string
-    photoCount: number
-    uploadedAt: string
-  } | null>(null)
+type PageProps = {
+  params: Promise<{ code: string }>
+}
 
-  useEffect(() => {
-    if (!code) {
-      router.push('/404')
-      return
-    }
+export default async function ShareLinkCoverPage({ params }: PageProps) {
+  const { code } = await params
+  const campaign = await resolveShareCodeServer(code)
 
-    const load = async () => {
-      const campaign = await resolveShareCode(code)
-      if (!campaign) {
-        router.push('/404')
-        return
-      }
-
-      const stats = await getCampaignPhotoStats(campaign.campaignId)
-
-      setResolved({
-        slug: campaign.slug,
-        clientId: campaign.clientId,
-        campaignId: campaign.campaignId,
-        name: campaign.name,
-        photoCount: stats.count,
-        uploadedAt: formatUploadedDate(stats.latestUploadedAt, campaign.updatedAt),
-      })
-      setLoading(false)
-    }
-
-    load()
-  }, [code, router])
-
-  if (loading || !resolved) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600" />
-      </div>
-    )
+  if (!campaign) {
+    notFound()
   }
 
-  const galleryHref = `/${resolved.slug}/${resolved.clientId}/${resolved.campaignId}`
+  const stats = await getCampaignPhotoStatsServer(campaign.campaignId)
+  const galleryHref = `/${campaign.slug}/${campaign.clientId}/${campaign.campaignId}`
 
   return (
     <CampaignCoverView
-      campaignName={resolved.name}
-      photoCount={resolved.photoCount}
-      uploadedAt={resolved.uploadedAt}
+      campaignName={campaign.name}
+      photoCount={stats.count}
+      uploadedAt={formatUploadedDate(stats.latestUploadedAt, campaign.updatedAt)}
       galleryHref={galleryHref}
     />
   )
