@@ -9,6 +9,7 @@ import {
 import { useEffect, useState, createContext, useContext, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import Toast from '@/components/Toast'
+import { isAdminEmail } from '@/lib/admin'
 
 // Create context for modals
 const AdminModalsContext = createContext<{
@@ -64,13 +65,11 @@ export default function AdminLayout({
   }
 
   useEffect(() => {
-    // Check if user is admin (admin@piksel.lt or renatas@piksel.lt)
-    const adminEmails = ['admin@piksel.lt', 'renatas@piksel.lt']
     console.log('Admin layout - Current user:', user?.email)
-    if (user && !adminEmails.includes(user.email || '')) {
+    if (user && !isAdminEmail(user.email)) {
       console.log('User is not admin, redirecting to login')
       router.push('/login')
-    } else if (user && adminEmails.includes(user.email || '')) {
+    } else if (user && isAdminEmail(user.email)) {
       console.log('User is admin, fetching data')
       fetchAgencies()
       fetchClients()
@@ -248,8 +247,7 @@ export default function AdminLayout({
     }
   }
 
-  const adminEmails = ['admin@piksel.lt', 'renatas@piksel.lt']
-  if (user && !adminEmails.includes(user.email || '')) {
+  if (user && !isAdminEmail(user.email)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">

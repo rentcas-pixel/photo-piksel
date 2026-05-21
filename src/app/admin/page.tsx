@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { Plus, Edit, Trash2, Users, Building2, Copy, Check, ChevronDown } from 'lucide-react'
+import { Plus, Edit, Trash2, Users, Building2, Copy, Check, ChevronDown, Search, Square, ChevronRight } from 'lucide-react'
 import { useAdminModals } from './layout'
 
 interface Agency {
@@ -14,18 +14,27 @@ interface Agency {
   created_at: string
 }
 
+interface ClientSearchResult {
+  id: string
+  name: string
+  created_at: string
+  agency?: {
+    name: string
+  } | Array<{
+    name: string
+  }> | null
+}
+
 export default function AdminPage() {
   const { showAgencyModal, showPhotoModal } = useAdminModals()
   const [agencies, setAgencies] = useState<Agency[]>([])
+  const [clients, setClients] = useState<ClientSearchResult[]>([])
   const [loading, setLoading] = useState(true)
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
   const [showDropdown, setShowDropdown] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => {
-    fetchAgencies()
-  }, [])
-
-  const fetchAgencies = async () => {
+  const fetchAgencies = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('agencies')
@@ -39,16 +48,58 @@ export default function AdminPage() {
       }
     } catch (error) {
       console.error('Error:', error)
+    }
+  }, [])
+
+  const fetchClients = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select(`
+          id,
+          name,
+          created_at,
+          agency:agencies(name)
+        `)
+        .order('name', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching clients:', error)
+      } else {
+        setClients(data || [])
+      }
+    } catch (error) {
+      console.error('Error:', error)
+    }
+  }, [])
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+
+    try {
+      await Promise.all([fetchAgencies(), fetchClients()])
     } finally {
       setLoading(false)
     }
-  }
+  }, [fetchAgencies, fetchClients])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const copyToClipboard = (slug: string) => {
     const url = `${window.location.origin}/${slug}`
     navigator.clipboard.writeText(url)
     setCopiedSlug(slug)
     setTimeout(() => setCopiedSlug(null), 2000)
+  }
+
+  const getAgencyName = (client: ClientSearchResult) => {
+    if (Array.isArray(client.agency)) {
+      return client.agency[0]?.name || ''
+    }
+
+    return client.agency?.name || ''
   }
 
   const handleDeleteAgency = async (agencyId: string) => {
@@ -74,6 +125,14 @@ export default function AdminPage() {
     }
   }
 
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase()
+  const filteredClients = normalizedSearchTerm
+    ? clients.filter((client) =>
+        client.name.toLowerCase().includes(normalizedSearchTerm) ||
+        getAgencyName(client).toLowerCase().includes(normalizedSearchTerm)
+      )
+    : []
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -85,8 +144,7 @@ export default function AdminPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-        </div>
+        <div />
         <div className="relative">
           <button
             onClick={() => setShowDropdown(!showDropdown)}
@@ -130,7 +188,56 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {agencies.length === 0 ? (
+      <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <div className="relative max-w-2xl">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Ieškoti kliento katalogo arba agentūros..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          />
+        </div>
+      </div>
+
+      {normalizedSearchTerm ? (
+        filteredClients.length === 0 ? (
+          <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
+            <div className="text-gray-300 mb-6">
+              <Square className="mx-auto h-16 w-16" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-800 mb-3">Klientų nerasta</h3>
+            <p className="text-gray-500 text-lg">Pabandykite įvesti kitą kliento ar agentūros pavadinimą</p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <ul className="divide-y divide-gray-100">
+              {filteredClients.map((client) => (
+                <li key={client.id} className="hover:bg-gray-50/90 transition-colors group">
+                  <Link
+                    href={`/admin/clients/${client.id}`}
+                    className="flex items-center gap-4 px-5 py-4 min-w-0"
+                  >
+                    <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600 shrink-0">
+                      <Square className="h-5 w-5" strokeWidth={1.75} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate" title={client.name}>
+                        {client.name}
+                      </p>
+                      <p className="text-sm text-gray-500 truncate" title={getAgencyName(client) || undefined}>
+                        {getAgencyName(client) || 'Be agentūros'}
+                      </p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 shrink-0 transition-colors" aria-hidden />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      ) : agencies.length === 0 ? (
         <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
           <div className="text-gray-300 mb-6">
             <Users className="mx-auto h-16 w-16" />
