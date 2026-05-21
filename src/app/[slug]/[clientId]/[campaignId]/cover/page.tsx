@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { CampaignCoverView } from '@/components/CampaignCoverView'
+import { CampaignCoverViewFromCampaign } from '@/components/CampaignCoverView'
 
 function formatUploadedDate(iso: string | null | undefined): string {
   if (!iso) return '—'
@@ -98,7 +98,7 @@ export default function CampaignCoverPage() {
   }
 
   return (
-    <CampaignCoverView
+    <CampaignCoverViewFromCampaign
       campaignName={campaignName}
       photoCount={photoCount}
       uploadedAt={uploadedAt}

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { CampaignCoverView } from '@/components/CampaignCoverView'
+import { CampaignCoverViewFromCampaign } from '@/components/CampaignCoverView'
 import { formatUploadedDate } from '@/lib/resolve-share-code'
 import {
   getCampaignPhotoStatsServer,
@@ -24,7 +24,7 @@ export default async function ShareLinkCoverPage({ params }: PageProps) {
   const galleryHref = `/${campaign.slug}/${campaign.clientId}/${campaign.campaignId}`
 
   return (
-    <CampaignCoverView
+    <CampaignCoverViewFromCampaign
       campaignName={campaign.name}
       photoCount={stats.count}
       uploadedAt={formatUploadedDate(stats.latestUploadedAt, campaign.updatedAt)}

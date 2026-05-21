@@ -1,11 +1,11 @@
 'use client'
 
-import { CampaignCoverView } from '@/components/CampaignCoverView'
+import { CampaignCoverViewFromCampaign } from '@/components/CampaignCoverView'
 
 /** Vietinis peržiūros mockup — tas pats komponentas kaip /p/{code} */
 export default function CoverMockupPage() {
   return (
-    <CampaignCoverView
+    <CampaignCoverViewFromCampaign
       campaignName="IKEA — Šaltibarščiai 2026"
       photoCount={24}
       uploadedAt="2026-05-18"
