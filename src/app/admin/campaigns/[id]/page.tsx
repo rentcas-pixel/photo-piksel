@@ -522,11 +522,13 @@ export default function AdminCampaignDetailPage() {
               )}
             </div>
             <button
+              type="button"
               onClick={handleEditClick}
-              className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
               title="Redaguoti kampaniją"
             >
-              <Edit className="h-5 w-5" />
+              <Edit className="h-4 w-4" />
+              Redaguoti
             </button>
           </div>
           
@@ -623,9 +625,10 @@ export default function AdminCampaignDetailPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
           {photos.map((photo) => (
-            <div key={photo.id} className="bg-white rounded-lg shadow-sm overflow-hidden group cursor-pointer">
-              <div 
-                className="relative bg-gray-100" 
+            <div key={photo.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <button
+                type="button"
+                className="relative block w-full bg-gray-100 cursor-pointer"
                 style={{ aspectRatio: '3/2' }}
                 onClick={() => setSelectedPhoto(photo)}
               >
@@ -635,43 +638,39 @@ export default function AdminCampaignDetailPage() {
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
                     <Plus className="h-6 w-6 text-gray-700" />
                   </div>
                 </div>
-                <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDownload(photo)
-                    }}
-                    className="p-2 bg-white bg-opacity-90 rounded-lg hover:bg-opacity-100 transition-colors shadow-sm"
-                    title="Atsisiųsti nuotrauką"
-                  >
-                    <Download className="h-4 w-4 text-gray-700" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void handleDeletePhoto(photo.id)
-                    }}
-                    className="p-2 bg-white bg-opacity-90 rounded-lg hover:bg-opacity-100 transition-colors shadow-sm"
-                    title="Ištrinti nuotrauką"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-600" />
-                  </button>
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-medium text-gray-900 truncate" title={photo.original_name}>
-                  {photo.original_name}
-                </h3>
-                <div className="mt-2">
+              </button>
+              <div className="p-3 flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="font-medium text-gray-900 truncate" title={photo.original_name}>
+                    {photo.original_name}
+                  </h3>
                   <span className="text-xs text-gray-500">
                     {new Date(photo.created_at).toLocaleDateString('lt-LT')}
                   </span>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => void handleDownload(photo)}
+                    className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+                    title="Atsisiųsti nuotrauką"
+                    aria-label="Atsisiųsti nuotrauką"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeletePhoto(photo.id)}
+                    className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                    title="Ištrinti nuotrauką"
+                    aria-label="Ištrinti nuotrauką"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -685,9 +684,10 @@ export default function AdminCampaignDetailPage() {
           <div className="relative max-w-7xl max-h-full">
             <div className="absolute top-4 right-4 flex gap-2 z-10">
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation()
-                  handleDownload(selectedPhoto)
+                  void handleDownload(selectedPhoto)
                 }}
                 className="p-3 bg-green-500 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
                 title="Atsisiųsti nuotrauką"
@@ -695,8 +695,21 @@ export default function AdminCampaignDetailPage() {
                 <Download className="h-6 w-6 text-white" />
               </button>
               <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void handleDeletePhoto(selectedPhoto.id)
+                }}
+                className="p-3 bg-red-600 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
+                title="Ištrinti nuotrauką"
+              >
+                <Trash2 className="h-6 w-6 text-white" />
+              </button>
+              <button
+                type="button"
                 onClick={() => setSelectedPhoto(null)}
-                className="p-3 bg-red-500 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
+                className="p-3 bg-gray-700 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
+                title="Uždaryti"
               >
                 <X className="h-6 w-6 text-white" />
               </button>
