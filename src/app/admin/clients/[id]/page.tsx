@@ -145,18 +145,26 @@ export default function AdminClientDetailPage() {
     if (!confirm('Ar tikrai norite ištrinti šią kampaniją? Bus ištrintos ir visos nuotraukos!')) return
 
     try {
-      const { error } = await supabase
-        .from('campaigns')
-        .delete()
-        .eq('id', campaignId)
-
-      if (error) {
-        console.error('Error deleting campaign:', error)
-        alert('Klaida trinant kampaniją')
-      } else {
-        fetchCampaigns()
-        fetchPhotoCounts()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        alert('Sesija pasibaigė. Prisijunkite iš naujo.')
+        return
       }
+
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        console.error('Error deleting campaign:', json)
+        alert((json as { error?: string }).error || 'Klaida trinant kampaniją')
+        return
+      }
+
+      fetchCampaigns()
+      fetchPhotoCounts()
     } catch (error) {
       console.error('Error:', error)
       alert('Klaida trinant kampaniją')

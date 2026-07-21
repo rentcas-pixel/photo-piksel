@@ -3,6 +3,7 @@ export const ADMIN_EMAILS = [
   'admin@piksel.lt',
   'renatas@piksel.lt',
   'romanas@piksel.lt',
+  'paulina@piksel.lt',
 ] as const
 
 export function isAdminEmail(email: string | undefined | null): boolean {

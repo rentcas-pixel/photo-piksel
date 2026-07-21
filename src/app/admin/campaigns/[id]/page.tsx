@@ -12,6 +12,8 @@ interface PhotoWithCampaign extends Photo {
   campaign: Campaign
 }
 
+const VERCEL_UPLOAD_LIMIT_BYTES = 3_500_000
+
 export default function AdminCampaignDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -267,6 +269,60 @@ export default function AdminCampaignDetailPage() {
     
     let successCount = 0
     let errorCount = 0
+    let lastUploadError = ''
+
+    const compressImageToLimit = async (
+      file: File,
+      maxBytes: number
+    ): Promise<File> => {
+      if (!file.type.startsWith('image/') || file.size <= maxBytes) {
+        return file
+      }
+      try {
+        const imageBitmap = await createImageBitmap(file)
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+
+        if (!ctx) return file
+
+        let scale = 1
+        let quality = 0.88
+        let outputBlob: Blob | null = null
+
+        // Aggressively reduce dimensions/quality to stay under Vercel multipart limits.
+        for (let attempt = 0; attempt < 14; attempt++) {
+          canvas.width = Math.max(1, Math.round(imageBitmap.width * scale))
+          canvas.height = Math.max(1, Math.round(imageBitmap.height * scale))
+          ctx.clearRect(0, 0, canvas.width, canvas.height)
+          ctx.drawImage(imageBitmap, 0, 0, canvas.width, canvas.height)
+
+          outputBlob = await new Promise<Blob | null>((resolve) => {
+            canvas.toBlob(resolve, 'image/jpeg', quality)
+          })
+
+          if (outputBlob && outputBlob.size <= maxBytes) {
+            break
+          }
+
+          quality = Math.max(0.35, quality - 0.07)
+          scale = Math.max(0.4, scale * 0.88)
+        }
+
+        imageBitmap.close()
+
+        if (!outputBlob || outputBlob.size > maxBytes) {
+          throw new Error('File too large even after compression')
+        }
+
+        const stem = file.name.replace(/\.[^.]+$/, '')
+        const safeStem = stem || 'photo'
+        const compressedName = `${safeStem}.jpg`
+        return new File([outputBlob], compressedName, { type: 'image/jpeg' })
+      } catch (compressionError) {
+        console.error('Compression failed:', compressionError)
+        return file
+      }
+    }
     
     try {
       // Upload files one by one to avoid timeout
@@ -274,42 +330,35 @@ export default function AdminCampaignDetailPage() {
         const file = filesArray[i]
         
         try {
-          // Generate unique filename
-          const timestamp = Date.now()
-          const randomString = Math.random().toString(36).substring(2, 8)
-          const fileName = `${timestamp}-${randomString}-${file.name}`
-          
-          // Upload to storage
-          const { error: uploadError } = await supabase.storage
-            .from('photos')
-            .upload(fileName, file)
-          
-          if (uploadError) {
-            console.error('Upload error:', uploadError)
+          const preparedFile = await compressImageToLimit(file, VERCEL_UPLOAD_LIMIT_BYTES)
+          if (preparedFile.size > VERCEL_UPLOAD_LIMIT_BYTES) {
+            throw new Error('Nuotrauka per didelė. Bandykite mažesnį failą.')
+          }
+          const formData = new FormData()
+          formData.append('file', preparedFile)
+          formData.append('campaignId', campaignId)
+
+          const response = await fetch('/api/upload-photo', {
+            method: 'POST',
+            body: formData,
+          })
+
+          const result = await response.json().catch(() => ({}))
+
+          if (!response.ok) {
+            const message =
+              (result as { error?: string }).error ||
+              `HTTP ${response.status}`
+            console.error('Upload error:', message, result)
+            if (i === 0) {
+              lastUploadError = message
+            }
             errorCount++
             setUploadProgress({ current: i + 1, total: totalFiles })
             continue
           }
-          
-          // Get public URL
-          const { data: { publicUrl } } = supabase.storage
-            .from('photos')
-            .getPublicUrl(fileName)
-          
-          // Insert into database
-          const { error: dbError } = await supabase.from('photos').insert({
-            campaign_id: campaignId,
-            filename: fileName,
-            original_name: file.name,
-            url: publicUrl,
-          })
-          
-          if (dbError) {
-            console.error('Database error:', dbError)
-            errorCount++
-          } else {
-            successCount++
-          }
+
+          successCount++
         } catch (fileError) {
           console.error('Error uploading file:', file.name, fileError)
           errorCount++
@@ -319,9 +368,16 @@ export default function AdminCampaignDetailPage() {
         setUploadProgress({ current: i + 1, total: totalFiles })
       }
       
-      // Show result message
-      if (errorCount > 0) {
+      if (successCount > 0 && errorCount === 0) {
+        alert(`Sėkmingai įkelta ${successCount} nuotraukų`)
+      } else if (successCount > 0 && errorCount > 0) {
         alert(`Įkelta: ${successCount} nuotraukų\nKlaidos: ${errorCount} nuotraukų`)
+      } else if (errorCount > 0) {
+        alert(
+          lastUploadError
+            ? `Nepavyko įkelti nuotraukų:\n${lastUploadError}`
+            : 'Nepavyko įkelti nuotraukų. Patikrinkite Vercel Environment Variables (SUPABASE_SERVICE_ROLE_KEY).'
+        )
       }
       
       // Refresh photos list
@@ -342,17 +398,26 @@ export default function AdminCampaignDetailPage() {
     if (!confirm('Ar tikrai norite ištrinti šią nuotrauką?')) return
 
     try {
-      const { error } = await supabase
-        .from('photos')
-        .delete()
-        .eq('id', photoId)
-
-      if (error) {
-        console.error('Error deleting photo:', error)
-        alert('Klaida trinant nuotrauką')
-      } else {
-        setPhotos(photos.filter(photo => photo.id !== photoId))
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        alert('Sesija pasibaigė. Prisijunkite iš naujo.')
+        return
       }
+
+      const res = await fetch(`/api/photos/${photoId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        console.error('Error deleting photo:', json)
+        alert((json as { error?: string }).error || 'Klaida trinant nuotrauką')
+        return
+      }
+
+      setPhotos((prev) => prev.filter((photo) => photo.id !== photoId))
+      setSelectedPhoto((prev) => (prev?.id === photoId ? null : prev))
     } catch (error) {
       console.error('Error:', error)
       alert('Klaida trinant nuotrauką')
@@ -376,21 +441,33 @@ export default function AdminCampaignDetailPage() {
     }
 
     try {
-      const { error } = await supabase
-        .from('campaigns')
-        .update({
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        alert('Sesija pasibaigė. Prisijunkite iš naujo.')
+        return
+      }
+
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           name: editName.trim(),
           description: editDescription.trim() || null,
-        })
-        .eq('id', campaignId)
+        }),
+      })
+      const json = await res.json().catch(() => ({}))
 
-      if (error) {
-        console.error('Error updating campaign:', error)
-        alert('Klaida atnaujinant kampaniją')
-      } else {
-        setShowEditModal(false)
-        fetchCampaign()
+      if (!res.ok) {
+        console.error('Error updating campaign:', json)
+        alert((json as { error?: string }).error || 'Klaida atnaujinant kampaniją')
+        return
       }
+
+      setShowEditModal(false)
+      fetchCampaign()
     } catch (error) {
       console.error('Error:', error)
       alert('Klaida atnaujinant kampaniją')
@@ -557,13 +634,14 @@ export default function AdminCampaignDetailPage() {
                   alt={photo.original_name}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute inset-0 flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="w-12 h-12 bg-white bg-opacity-90 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                     <Plus className="h-6 w-6 text-gray-700" />
                   </div>
                 </div>
-                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleDownload(photo)
@@ -574,9 +652,10 @@ export default function AdminCampaignDetailPage() {
                     <Download className="h-4 w-4 text-gray-700" />
                   </button>
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation()
-                      handleDeletePhoto(photo.id)
+                      void handleDeletePhoto(photo.id)
                     }}
                     className="p-2 bg-white bg-opacity-90 rounded-lg hover:bg-opacity-100 transition-colors shadow-sm"
                     title="Ištrinti nuotrauką"

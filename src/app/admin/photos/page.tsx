@@ -78,18 +78,26 @@ export default function AdminPhotosPage() {
     if (!confirm('Ar tikrai norite ištrinti šią nuotrauką?')) return
 
     try {
-      const { error } = await supabase
-        .from('photos')
-        .delete()
-        .eq('id', photoId)
-
-      if (error) {
-        console.error('Error deleting photo:', error)
-        alert('Klaida trinant nuotrauką')
-      } else {
-        setPhotos(photos.filter(photo => photo.id !== photoId))
-        alert('Nuotrauka sėkmingai ištrinta')
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        alert('Sesija pasibaigė. Prisijunkite iš naujo.')
+        return
       }
+
+      const res = await fetch(`/api/photos/${photoId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        console.error('Error deleting photo:', json)
+        alert((json as { error?: string }).error || 'Klaida trinant nuotrauką')
+        return
+      }
+
+      setPhotos((prev) => prev.filter((photo) => photo.id !== photoId))
+      alert('Nuotrauka sėkmingai ištrinta')
     } catch (error) {
       console.error('Error:', error)
       alert('Klaida trinant nuotrauką')
