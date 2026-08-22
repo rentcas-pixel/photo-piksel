@@ -21,3 +21,36 @@ export function safeStorageFileName(originalName: string): string {
 
   return `${Date.now()}-${safeStem}${safeExt}`
 }
+
+/** Storage object key from DB filename or public URL (legacy rows stored full URLs). */
+export function storageObjectKey(
+  filename: string | null | undefined,
+  url?: string | null
+): string | null {
+  const fromName = (filename || '').trim()
+  if (fromName && !/^https?:\/\//i.test(fromName)) {
+    return fromName.replace(/^\/+/, '')
+  }
+
+  const source = /^https?:\/\//i.test(fromName) ? fromName : url || ''
+  if (!source) return fromName || null
+
+  try {
+    const parsed = new URL(source)
+    const markers = [
+      '/storage/v1/object/public/photos/',
+      '/storage/v1/object/sign/photos/',
+      '/storage/v1/object/photos/',
+    ]
+    for (const marker of markers) {
+      const idx = parsed.pathname.indexOf(marker)
+      if (idx !== -1) {
+        return decodeURIComponent(parsed.pathname.slice(idx + marker.length))
+      }
+    }
+  } catch {
+    // ignore malformed URLs
+  }
+
+  return fromName || null
+}

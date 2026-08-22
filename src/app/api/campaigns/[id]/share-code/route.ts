@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-import { isAdminEmail } from '@/lib/admin'
+import { requireAdminApi } from '@/lib/require-admin-api'
 import { allocateUniqueShareCode } from '@/lib/share-code'
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 export async function POST(
   request: NextRequest,
@@ -17,54 +12,10 @@ export async function POST(
       return NextResponse.json({ error: 'Trūksta ID' }, { status: 400 })
     }
 
-    const authHeader = request.headers.get('Authorization')
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Nėra sesijos. Prisijunkite iš naujo.' },
-        { status: 401 }
-      )
-    }
+    const auth = await requireAdminApi(request)
+    if (!auth.ok) return auth.response
 
-    if (!supabaseUrl || !supabaseAnonKey) {
-      return NextResponse.json(
-        {
-          error:
-            'Trūksta NEXT_PUBLIC_SUPABASE_URL arba NEXT_PUBLIC_SUPABASE_ANON_KEY Vercel aplinkoje.',
-        },
-        { status: 500 }
-      )
-    }
-
-    if (!serviceKey || serviceKey === 'placeholder-service-key') {
-      return NextResponse.json(
-        {
-          error:
-            'Trūksta SUPABASE_SERVICE_ROLE_KEY Vercel: Project → Settings → Environment Variables → pridėkite rakta iš Supabase (Settings → API), perdeploy.',
-        },
-        { status: 500 }
-      )
-    }
-
-    const userClient = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
-
-    const {
-      data: { user },
-      error: userError,
-    } = await userClient.auth.getUser()
-
-    if (userError || !user?.email || !isAdminEmail(user.email)) {
-      return NextResponse.json({ error: 'Neturite teisės.' }, { status: 403 })
-    }
-
-    const admin = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
-
-    const { data: existing, error: fetchError } = await admin
+    const { data: existing, error: fetchError } = await auth.admin
       .from('campaigns')
       .select('share_code')
       .eq('id', campaignId)
@@ -79,8 +30,8 @@ export async function POST(
     }
 
     for (let attempt = 0; attempt < 5; attempt++) {
-      const code = await allocateUniqueShareCode(admin)
-      const { data: updated, error: updateError } = await admin
+      const code = await allocateUniqueShareCode(auth.admin)
+      const { data: updated, error: updateError } = await auth.admin
         .from('campaigns')
         .update({ share_code: code })
         .eq('id', campaignId)
@@ -92,7 +43,7 @@ export async function POST(
         return NextResponse.json({ share_code: updated.share_code })
       }
 
-      const { data: refill } = await admin
+      const { data: refill } = await auth.admin
         .from('campaigns')
         .select('share_code')
         .eq('id', campaignId)

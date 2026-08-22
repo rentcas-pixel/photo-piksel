@@ -7,6 +7,7 @@ import { Campaign, Client, Photo } from '@/types/database'
 import { Download, Image as ImageIcon, DownloadCloud, Trash2, ChevronRight, Upload, X, Plus, Edit, Copy, Check } from 'lucide-react'
 import JSZip from 'jszip'
 import Link from 'next/link'
+import { adminApiRequest } from '@/lib/admin-fetch'
 
 interface PhotoWithCampaign extends Photo {
   campaign: Campaign
@@ -33,6 +34,7 @@ export default function AdminCampaignDetailPage() {
   const [showEditModal, setShowEditModal] = useState(false)
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
+  const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -395,24 +397,18 @@ export default function AdminCampaignDetailPage() {
   }
 
   const handleDeletePhoto = async (photoId: string) => {
+    if (deletingPhotoId) return
     if (!confirm('Ar tikrai norite ištrinti šią nuotrauką?')) return
 
+    setDeletingPhotoId(photoId)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        alert('Sesija pasibaigė. Prisijunkite iš naujo.')
-        return
-      }
-
-      const res = await fetch(`/api/photos/${photoId}`, {
+      const result = await adminApiRequest(`/api/photos/${photoId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${session.access_token}` },
       })
-      const json = await res.json().catch(() => ({}))
 
-      if (!res.ok) {
-        console.error('Error deleting photo:', json)
-        alert((json as { error?: string }).error || 'Klaida trinant nuotrauką')
+      if (!result.ok) {
+        console.error('Error deleting photo:', result.error)
+        alert(result.error)
         return
       }
 
@@ -421,6 +417,8 @@ export default function AdminCampaignDetailPage() {
     } catch (error) {
       console.error('Error:', error)
       alert('Klaida trinant nuotrauką')
+    } finally {
+      setDeletingPhotoId(null)
     }
   }
 
@@ -664,8 +662,13 @@ export default function AdminCampaignDetailPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleDeletePhoto(photo.id)}
-                    className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      void handleDeletePhoto(photo.id)
+                    }}
+                    disabled={deletingPhotoId === photo.id}
+                    className="p-2 rounded-lg text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
                     title="Ištrinti nuotrauką"
                     aria-label="Ištrinti nuotrauką"
                   >
@@ -697,10 +700,12 @@ export default function AdminCampaignDetailPage() {
               <button
                 type="button"
                 onClick={(e) => {
+                  e.preventDefault()
                   e.stopPropagation()
                   void handleDeletePhoto(selectedPhoto.id)
                 }}
-                className="p-3 bg-red-600 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
+                disabled={deletingPhotoId === selectedPhoto.id}
+                className="p-3 bg-red-600 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors disabled:opacity-50"
                 title="Ištrinti nuotrauką"
               >
                 <Trash2 className="h-6 w-6 text-white" />

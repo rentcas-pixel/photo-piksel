@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminApi } from '@/lib/require-admin-api'
+import { storageObjectKey } from '@/lib/storage-filename'
 
 export async function PATCH(
   request: NextRequest,
@@ -73,12 +74,12 @@ export async function DELETE(
 
     const { data: photos } = await auth.admin
       .from('photos')
-      .select('id, filename')
+      .select('id, filename, url')
       .eq('campaign_id', campaignId)
 
     if (photos && photos.length > 0) {
       const filenames = photos
-        .map((p) => p.filename)
+        .map((p) => storageObjectKey(p.filename, p.url))
         .filter((name): name is string => Boolean(name))
 
       const { error: photosDeleteError } = await auth.admin

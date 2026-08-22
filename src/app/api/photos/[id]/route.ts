@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminApi } from '@/lib/require-admin-api'
+import { storageObjectKey } from '@/lib/storage-filename'
+
+export const dynamic = 'force-dynamic'
 
 export async function DELETE(
   request: NextRequest,
@@ -16,7 +19,7 @@ export async function DELETE(
 
     const { data: photo, error: fetchError } = await auth.admin
       .from('photos')
-      .select('id, filename')
+      .select('id, filename, url')
       .eq('id', photoId)
       .maybeSingle()
 
@@ -32,12 +35,11 @@ export async function DELETE(
       return NextResponse.json({ error: 'Nuotrauka nerasta.' }, { status: 404 })
     }
 
-    const { data: deleted, error: deleteError } = await auth.admin
+    const { data: deletedRows, error: deleteError } = await auth.admin
       .from('photos')
       .delete()
       .eq('id', photoId)
       .select('id')
-      .maybeSingle()
 
     if (deleteError) {
       console.error('Photo delete error:', deleteError)
@@ -47,17 +49,26 @@ export async function DELETE(
       )
     }
 
-    if (!deleted) {
-      return NextResponse.json(
-        { error: 'Nuotrauka neištrinta (nerasta arba nėra teisių).' },
-        { status: 404 }
-      )
+    if (!deletedRows?.length) {
+      const { data: stillThere } = await auth.admin
+        .from('photos')
+        .select('id')
+        .eq('id', photoId)
+        .maybeSingle()
+
+      if (stillThere) {
+        return NextResponse.json(
+          { error: 'Nuotrauka neištrinta (nerasta arba nėra teisių).' },
+          { status: 404 }
+        )
+      }
     }
 
-    if (photo.filename) {
+    const objectKey = storageObjectKey(photo.filename, photo.url)
+    if (objectKey) {
       const { error: storageError } = await auth.admin.storage
         .from('photos')
-        .remove([photo.filename])
+        .remove([objectKey])
 
       if (storageError) {
         console.error('Storage delete warning:', storageError)

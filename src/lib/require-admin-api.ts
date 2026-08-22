@@ -65,12 +65,25 @@ export async function requireAdminApi(
     auth: { persistSession: false, autoRefreshToken: false },
   })
 
+  // Pass the JWT explicitly — getUser() without a token ignores global
+  // Authorization headers when persistSession is false, so delete/update
+  // APIs would always return 403 while unauthenticated upload still worked.
   const {
     data: { user },
     error: userError,
-  } = await userClient.auth.getUser()
+  } = await userClient.auth.getUser(token)
 
-  if (userError || !user?.email || !isAdminEmail(user.email)) {
+  if (userError || !user) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: 'Sesija pasibaigė. Prisijunkite iš naujo.' },
+        { status: 401 }
+      ),
+    }
+  }
+
+  if (!user.email || !isAdminEmail(user.email)) {
     return {
       ok: false,
       response: NextResponse.json(

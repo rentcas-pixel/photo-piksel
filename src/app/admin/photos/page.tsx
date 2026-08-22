@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Photo, Campaign, Client } from '@/types/database'
 import { Plus, Search, Trash2 } from 'lucide-react'
 import { useAdminModals } from '../layout'
+import { adminApiRequest } from '@/lib/admin-fetch'
 
 interface PhotoWithDetails extends Photo {
   campaign: Campaign & {
@@ -78,26 +79,17 @@ export default function AdminPhotosPage() {
     if (!confirm('Ar tikrai norite ištrinti šią nuotrauką?')) return
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        alert('Sesija pasibaigė. Prisijunkite iš naujo.')
-        return
-      }
-
-      const res = await fetch(`/api/photos/${photoId}`, {
+      const result = await adminApiRequest(`/api/photos/${photoId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${session.access_token}` },
       })
-      const json = await res.json().catch(() => ({}))
 
-      if (!res.ok) {
-        console.error('Error deleting photo:', json)
-        alert((json as { error?: string }).error || 'Klaida trinant nuotrauką')
+      if (!result.ok) {
+        console.error('Error deleting photo:', result.error)
+        alert(result.error)
         return
       }
 
       setPhotos((prev) => prev.filter((photo) => photo.id !== photoId))
-      alert('Nuotrauka sėkmingai ištrinta')
     } catch (error) {
       console.error('Error:', error)
       alert('Klaida trinant nuotrauką')
