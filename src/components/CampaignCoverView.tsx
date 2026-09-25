@@ -35,7 +35,7 @@ function PikselLogo({ compact = false }: { compact?: boolean }) {
 
 function CoverActionButton({ action }: { action: CoverAction }) {
   const className =
-    'w-full flex items-center justify-center gap-2 px-6 py-4 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors'
+    'w-full flex items-center justify-center gap-2 px-6 py-4 bg-[#242820] text-white text-sm font-medium rounded-full hover:bg-[#424b36] transition-colors'
 
   if (action.href) {
     return (
@@ -90,8 +90,9 @@ export function CampaignCoverView({ title, subtitleLines, action }: CampaignCove
   }, [nextSlide])
 
   return (
-    <div className="relative min-h-screen bg-gray-900">
+    <div className="relative min-h-[100svh] bg-gray-900 overflow-hidden">
       <Image src={current.image} alt={current.name} fill className="object-cover" priority />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/5 to-black/15" />
 
       <div className="absolute bottom-10 left-6 sm:left-10 z-10 pointer-events-none max-w-[40%]">
         <p className="text-white text-base sm:text-lg font-medium tracking-tight drop-shadow-md">
@@ -105,9 +106,10 @@ export function CampaignCoverView({ title, subtitleLines, action }: CampaignCove
             <button
               key={i}
               type="button"
-              aria-label={`Ekranas ${i + 1}`}
+              aria-label={BRAND_SCREEN_SLIDES[i].name}
+              aria-pressed={i === slide}
               onClick={() => goToSlide(i)}
-              className={`h-2 rounded-full transition-all ${
+              className={`h-3 rounded-full transition-all ${
                 i === slide ? 'w-6 bg-white' : 'w-2 bg-white/50 hover:bg-white/80'
               }`}
             />
@@ -115,14 +117,14 @@ export function CampaignCoverView({ title, subtitleLines, action }: CampaignCove
         </div>
       )}
 
-      <div className="absolute right-4 sm:right-8 top-1/2 -translate-y-1/2 -translate-x-5 z-10 w-[calc(100%-2rem)] sm:w-full max-w-[360px]">
-        <div className="bg-white rounded-xl border border-gray-200/80 p-[1.8rem] sm:p-[2.1rem] space-y-6 shadow-sm">
-          <PikselLogo compact />
+      <div className="relative ml-auto flex min-h-[100svh] items-center px-5 py-28 sm:px-12 lg:px-20 z-10 w-full sm:max-w-[560px]">
+        <div className="w-full bg-[#fafaf5] rounded-2xl p-8 sm:p-11 space-y-9 shadow-2xl">
+          <div className="flex items-center justify-between gap-4"><PikselLogo compact /><span className="text-[9px] uppercase tracking-[0.2em] text-gray-500">Photo Proof</span></div>
 
-          <div className="space-y-1">
-            <p className="text-[15px] font-semibold text-gray-900 leading-snug">{title}</p>
+          <div className="space-y-3">
+            <p className="text-3xl sm:text-4xl font-medium tracking-[-0.04em] text-[#242820] leading-[1.12] break-words">{title}</p>
             {subtitleLines.map((line, i) => (
-              <p key={i} className="text-sm text-gray-600">
+              <p key={i} className="text-xs text-gray-500">
                 {line}
               </p>
             ))}

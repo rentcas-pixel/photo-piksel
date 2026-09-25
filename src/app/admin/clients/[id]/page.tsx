@@ -193,7 +193,7 @@ export default function AdminClientDetailPage() {
       {agency && (
         <div className="flex items-center text-sm text-gray-600">
           <Link href="/admin" className="hover:text-indigo-600">
-            Dashboard
+            Administravimas
           </Link>
           <ChevronRight className="h-4 w-4 mx-2" />
           <Link href={`/admin/agencies/${agency.id}`} className="hover:text-indigo-600">
@@ -205,7 +205,7 @@ export default function AdminClientDetailPage() {
       )}
 
       {/* Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+      <div className="proof-detail-heading">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">{client.name}</h1>
@@ -258,7 +258,7 @@ export default function AdminClientDetailPage() {
                   className="flex flex-1 items-center gap-4 px-5 py-4 min-w-0"
                 >
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="font-semibold text-gray-900 truncate" title={campaign.name}>
+                    <p className="proof-list-title" title={campaign.name}>
                       {campaign.name}
                     </p>
                     {campaign.description ? (
@@ -290,7 +290,7 @@ export default function AdminClientDetailPage() {
 
       {/* Add Campaign Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Nauja kampanija</h2>
             

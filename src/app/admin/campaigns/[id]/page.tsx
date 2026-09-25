@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Campaign, Client, Photo } from '@/types/database'
-import { Download, Image as ImageIcon, DownloadCloud, Trash2, ChevronRight, Upload, X, Plus, Edit, Copy, Check } from 'lucide-react'
+import { Download, Image as ImageIcon, DownloadCloud, Trash2, ChevronLeft, ChevronRight, Upload, X, Plus, Edit, Copy, Check } from 'lucide-react'
 import JSZip from 'jszip'
 import Link from 'next/link'
 import { adminApiRequest } from '@/lib/admin-fetch'
@@ -35,6 +35,34 @@ export default function AdminCampaignDetailPage() {
   const [editName, setEditName] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [deletingPhotoId, setDeletingPhotoId] = useState<string | null>(null)
+  const [checkedPhotos, setCheckedPhotos] = useState<string[]>([])
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
+  const downloadBusy = React.useRef(false)
+  const touchStart = React.useRef<{ x: number; y: number } | null>(null)
+  const navigatePhoto = (step: number) => setSelectedPhoto(current => {
+    if (!current || !photos.length) return current
+    const index = photos.findIndex(photo => photo.id === current.id)
+    return photos[(index + photos.length + step) % photos.length]
+  })
+  useEffect(() => {
+    if (!selectedPhoto) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedPhoto(null)
+      if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+        event.preventDefault()
+        setSelectedPhoto(current => {
+          if (!current || !photos.length) return current
+          const index = photos.findIndex(photo => photo.id === current.id)
+          return photos[(index + photos.length + (event.key === 'ArrowRight' ? 1 : -1)) % photos.length]
+        })
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => { document.body.style.overflow = previous; window.removeEventListener('keydown', handleKey) }
+  }, [selectedPhoto, photos])
+  useEffect(() => { setCheckedPhotos(ids => ids.filter(id => photos.some(photo => photo.id === id))) }, [photos])
   const fileInputRef = React.useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -224,26 +252,30 @@ export default function AdminCampaignDetailPage() {
     }
   }
 
-  const handleDownloadAll = async () => {
-    if (photos.length === 0) return
+  const handleDownloadAll = async (selection: PhotoWithCampaign[] = photos) => {
+    if (!selection.length || downloadBusy.current) return
+    downloadBusy.current = true
+    setDownloadProgress(0)
     
     try {
       const zip = new JSZip()
       
-      for (let i = 0; i < photos.length; i++) {
-        const photo = photos[i]
+      for (let i = 0; i < selection.length; i++) {
+        const photo = selection[i]
         const extension = photo.original_name.split('.').pop() || 'jpg'
         const uploadDate = new Date(photo.created_at).toISOString().split('T')[0]
         const newFilename = `Piksel_${client?.name}_${campaign?.name}_${uploadDate}_${i + 1}.${extension}`
         
         const response = await fetch(photo.url)
+        if (!response.ok) throw new Error('Nuotrauka nepasiekiama')
         const blob = await response.blob()
         zip.file(newFilename, blob)
+        setDownloadProgress(Math.round((i + 1) / selection.length * 75))
       }
       
-      const zipBlob = await zip.generateAsync({ type: 'blob' })
+      const zipBlob = await zip.generateAsync({ type: 'blob' }, meta => setDownloadProgress(Math.round(75 + meta.percent / 4)))
       const url = window.URL.createObjectURL(zipBlob)
-      const uploadDate = new Date(photos[0].created_at).toISOString().split('T')[0]
+      const uploadDate = new Date(selection[0].created_at).toISOString().split('T')[0]
       const zipFilename = `Piksel_${client?.name}_${campaign?.name}_${uploadDate}.zip`
       
       const a = document.createElement('a')
@@ -253,11 +285,11 @@ export default function AdminCampaignDetailPage() {
       a.click()
       document.body.removeChild(a)
       
-      window.URL.revokeObjectURL(url)
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 30000)
     } catch (error) {
       console.error('Error downloading all photos:', error)
       alert('Klaida atsisiunčiant nuotraukas')
-    }
+    } finally { downloadBusy.current = false; setDownloadProgress(null) }
   }
 
   const handleUploadPhotos = async (files: FileList | null) => {
@@ -494,7 +526,7 @@ export default function AdminCampaignDetailPage() {
       {agency && client && (
         <div className="flex items-center text-sm text-gray-600">
           <Link href="/admin" className="hover:text-indigo-600">
-            Dashboard
+            Administravimas
           </Link>
           <ChevronRight className="h-4 w-4 mx-2" />
           <Link href={`/admin/agencies/${agency.id}`} className="hover:text-indigo-600">
@@ -510,11 +542,11 @@ export default function AdminCampaignDetailPage() {
       )}
 
       {/* Header */}
-      <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+      <div className="proof-detail-heading">
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">{campaign.name}</h1>
+              <h1 className="text-3xl font-bold text-gray-900">{client?.name}</h1><p className="proof-campaign-name">{campaign.name}</p>
               {campaign.description && (
                 <p className="text-gray-600 mt-1">{campaign.description}</p>
               )}
@@ -581,7 +613,7 @@ export default function AdminCampaignDetailPage() {
             
             {photos.length > 0 && (
               <button
-                onClick={handleDownloadAll}
+                disabled={downloadProgress !== null} onClick={() => handleDownloadAll()}
                 className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm h-10"
               >
                 <DownloadCloud className="h-4 w-4 mr-2" />
@@ -592,6 +624,8 @@ export default function AdminCampaignDetailPage() {
         </div>
       </div>
 
+      {photos.length > 0 && <div className="proof-download-tools"><label><input type="checkbox" checked={checkedPhotos.length === photos.length} onChange={e => setCheckedPhotos(e.target.checked ? photos.map(p => p.id) : [])} />Pažymėti visas · {checkedPhotos.length}</label><button disabled={downloadProgress !== null || !checkedPhotos.length} onClick={() => handleDownloadAll(photos.filter(photo => checkedPhotos.includes(photo.id)))}>Atsisiųsti pasirinktas ({checkedPhotos.length})</button></div>}
+      {downloadProgress !== null && <div className="proof-download-progress" role="status">Ruošiamas ZIP <progress max={100} value={downloadProgress} />{downloadProgress}%</div>}
       {/* Drag & Drop Zone */}
       <div
         onDragOver={handleDragOver}
@@ -621,9 +655,9 @@ export default function AdminCampaignDetailPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {photos.map((photo) => (
-            <div key={photo.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div key={photo.id} className="bg-white rounded-lg shadow-sm overflow-hidden"><label className="proof-photo-check"><input type="checkbox" aria-label={`Pasirinkti ${photo.original_name}`} checked={checkedPhotos.includes(photo.id)} onChange={e => setCheckedPhotos(ids => e.target.checked ? [...ids, photo.id] : ids.filter(id => id !== photo.id))} />Pasirinkti</label>
               <button
                 type="button"
                 className="relative block w-full bg-gray-100 cursor-pointer"
@@ -683,8 +717,8 @@ export default function AdminCampaignDetailPage() {
 
       {/* Photo Modal */}
       {selectedPhoto && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="relative max-w-7xl max-h-full">
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"><div className="proof-thumbnails">{photos.map(photo => <button key={photo.id} aria-label={`Rodyti ${photo.original_name}`} aria-pressed={selectedPhoto.id === photo.id} onClick={() => setSelectedPhoto(photo)}><img src={photo.url} alt="" /></button>)}</div>
+          <div className="relative max-w-7xl max-h-full"><button className="absolute left-2 top-1/2 z-20 rounded-full bg-black/70 p-3 text-white" onClick={() => navigatePhoto(-1)} aria-label="Ankstesnė nuotrauka"><ChevronLeft /></button><button className="absolute right-2 top-1/2 z-20 rounded-full bg-black/70 p-3 text-white" onClick={() => navigatePhoto(1)} aria-label="Kita nuotrauka"><ChevronRight /></button>
             <div className="absolute top-4 right-4 flex gap-2 z-10">
               <button
                 type="button"
@@ -720,9 +754,10 @@ export default function AdminCampaignDetailPage() {
               </button>
             </div>
             <img
+              onTouchStart={e => { touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }} onTouchEnd={e => { if (!touchStart.current) return; const dx = e.changedTouches[0].clientX - touchStart.current.x, dy = e.changedTouches[0].clientY - touchStart.current.y; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) navigatePhoto(dx < 0 ? 1 : -1); touchStart.current = null }}
               src={selectedPhoto.url}
               alt={selectedPhoto.original_name}
-              className="max-w-full max-h-full object-contain rounded-lg"
+              className="max-w-full max-h-[calc(100svh-180px)] object-contain rounded-lg"
             />
           </div>
         </div>
@@ -730,7 +765,7 @@ export default function AdminCampaignDetailPage() {
 
       {/* Edit Campaign Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Redaguoti kampaniją</h2>
             

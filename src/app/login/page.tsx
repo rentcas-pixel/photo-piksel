@@ -1,41 +1,30 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { ADMIN_EMAILS, isAdminEmail } from '@/lib/admin'
+import { isAdminEmail } from '@/lib/admin'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('Form submitted, email:', email)
     setLoading(true)
     setError('')
 
     try {
-      console.log('Attempting to sign in...')
-      console.log('Supabase client:', supabase ? 'exists' : 'missing')
-      console.log('Email:', email)
-      console.log('Password length:', password.length)
       
       const signInPromise = supabase.auth.signInWithPassword({
         email,
         password,
       })
       
-      console.log('Sign in promise created, waiting for response...')
       
       const { data, error } = await signInPromise
 
-      console.log('Sign in response received!')
-      console.log('Data:', data)
-      console.log('Error:', error)
 
       if (error) {
         console.error('Login error:', error)
@@ -59,18 +48,14 @@ export default function LoginPage() {
       }
 
       // Store user in localStorage
-      console.log('Storing user in localStorage:', data.user.email)
       localStorage.setItem('mock-user', JSON.stringify(data.user))
       
       // Redirect admin users to admin panel
-      console.log('Checking if user is admin. Email:', data.user.email, 'Admin emails:', ADMIN_EMAILS)
       
       if (isAdminEmail(data.user.email)) {
-        console.log('User is admin, redirecting to /admin')
         // Use window.location for more reliable redirect
         window.location.href = '/admin'
       } else {
-        console.log('User is not admin, showing error')
         setError('Jūs neturite administratoriaus teisių')
         setLoading(false)
       }
@@ -82,23 +67,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="proof-login min-h-screen flex">
       {/* Left side - Login Form (30%) */}
-      <div className="w-full lg:w-[30%] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-white">
+      <div className="w-full lg:w-[40%] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 bg-white">
         <div className="max-w-md w-full space-y-8">
           <div>
             <div className="flex justify-center mb-8">
               <img
                 src="/Piksel-logo-juodas-2026.png"
                 alt="Piksel"
-                className="h-16 w-auto"
+                className="h-10 w-auto"
               />
             </div>
           </div>
+<div className="max-w-xs mx-auto"><h1>Prisijungti.</h1><p className="proof-login-copy">Piksel komandos erdvė kampanijoms ir nuotraukoms valdyti.</p></div>
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           <div className="space-y-4 max-w-xs mx-auto">
             <div>
-              <label htmlFor="email" className="sr-only">
+              <label htmlFor="email" className="block">
                 El. paštas
               </label>
               <input
@@ -114,7 +100,7 @@ export default function LoginPage() {
               />
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
+              <label htmlFor="password" className="block">
                 Slaptažodis
               </label>
               <input
@@ -149,7 +135,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right side - Image (70%) */}
-      <div className="hidden lg:flex lg:w-[70%] relative">
+      <div className="hidden lg:flex lg:w-[60%] relative">
         <img
           src="/Foto.jpg"
           alt="Piksel Photo Proof"

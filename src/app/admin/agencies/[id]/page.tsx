@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Client } from '@/types/database'
 import Link from 'next/link'
-import { Search, Square, Image as ImageIcon, Plus, ChevronDown, Upload, ChevronRight, Trash2 } from 'lucide-react'
+import { Search, Square, Image as ImageIcon, Plus, ChevronDown, Upload, ChevronRight, Trash2, Edit } from 'lucide-react'
 import { useAdminModals } from '../../layout'
 
 export default function AgencyClientsPage() {
@@ -144,7 +144,7 @@ export default function AgencyClientsPage() {
       {agency && (
         <div className="flex items-center text-sm text-gray-600">
           <Link href="/admin" className="hover:text-indigo-600">
-            Dashboard
+            Administravimas
           </Link>
           <ChevronRight className="h-4 w-4 mx-2" />
           <span className="text-gray-900 font-medium">{agency.name}</span>
@@ -153,7 +153,7 @@ export default function AgencyClientsPage() {
 
       {/* Agency Header */}
       {agency && (
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+        <div className="proof-detail-heading">
           <div className="flex justify-between items-center gap-4 flex-wrap">
             <div className="flex flex-col sm:flex-row sm:items-end gap-4 flex-1 min-w-0">
               <div className="shrink-0">
@@ -238,7 +238,7 @@ export default function AgencyClientsPage() {
                   className="flex flex-1 items-center gap-4 px-5 py-4 min-w-0"
                 >
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="font-semibold text-gray-900 truncate" title={client.name}>
+                    <p className="proof-list-title" title={client.name}>
                       {client.name}
                     </p>
                     {clientLastUpdated[client.id] ? (
@@ -256,6 +256,7 @@ export default function AgencyClientsPage() {
                   </span>
                   <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 shrink-0 transition-colors" aria-hidden />
                 </Link>
+                <Link href={`/admin/clients/${client.id}/edit`} className="proof-icon" aria-label={`Redaguoti ${client.name}`} title="Redaguoti klientą"><Edit size={18} /></Link>
                 <button
                   type="button"
                   onClick={() => handleDeleteClient(client.id)}

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
-import { Plus, Edit, Trash2, Users, Building2, Copy, Check, ChevronDown, Search, Square, ChevronRight } from 'lucide-react'
+import { Plus, Edit, Trash2, Folder, Copy, Check, Search, ChevronRight, Upload } from 'lucide-react'
 import { useAdminModals } from './layout'
 
 interface Agency {
@@ -18,6 +18,7 @@ interface ClientSearchResult {
   id: string
   name: string
   created_at: string
+  agency_id: string
   agency?: {
     name: string
   } | Array<{
@@ -31,7 +32,6 @@ export default function AdminPage() {
   const [clients, setClients] = useState<ClientSearchResult[]>([])
   const [loading, setLoading] = useState(true)
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null)
-  const [showDropdown, setShowDropdown] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
   const fetchAgencies = useCallback(async () => {
@@ -59,6 +59,7 @@ export default function AdminPage() {
           id,
           name,
           created_at,
+          agency_id,
           agency:agencies(name)
         `)
         .order('name', { ascending: true })
@@ -141,207 +142,20 @@ export default function AdminPage() {
     )
   }
 
+  const visibleAgencies = agencies.filter(agency => agency.name.toLocaleLowerCase('lt').includes(normalizedSearchTerm))
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div />
-        <div className="relative">
-          <button
-            onClick={() => setShowDropdown(!showDropdown)}
-            className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Naujas
-            <ChevronDown className="h-4 w-4 ml-2" />
-          </button>
-          
-          {showDropdown && (
-            <>
-              <div 
-                className="fixed inset-0 z-10" 
-                onClick={() => setShowDropdown(false)}
-              />
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                <button
-                  onClick={() => {
-                    setShowDropdown(false)
-                    showAgencyModal()
-                  }}
-                  className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
-                >
-                  <Building2 className="h-4 w-4 mr-3 text-indigo-600" />
-                  Katalogas
-                </button>
-                <button
-                  onClick={() => {
-                    setShowDropdown(false)
-                    showPhotoModal()
-                  }}
-                  className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
-                >
-                  <Plus className="h-4 w-4 mr-3 text-green-600" />
-                  Įkelti foto
-                </button>
-              </div>
-            </>
-          )}
-        </div>
+    <div className="space-y-8">
+      <section className="proof-page-heading">
+        <div><p className="proof-eyebrow">JŪSŲ DARBO ERDVĖ</p><h1>Agentūros.</h1><p className="proof-description">Tvarkykite agentūras, klientų katalogus ir kampanijų nuotraukas.</p></div>
+        <div className="proof-actions"><button onClick={showPhotoModal} className="proof-secondary"><Upload size={17} />Įkelti nuotraukas</button><button onClick={showAgencyModal} className="proof-primary"><Plus size={17} />Nauja agentūra</button></div>
+      </section>
+      <div className="proof-stats"><div><strong>{agencies.length}</strong><span>Agentūros</span></div><div><strong>{clients.length}</strong><span>Klientų katalogai</span></div></div>
+      <div className="proof-toolbar"><h2>{normalizedSearchTerm ? 'Paieškos rezultatai' : 'Visos agentūros'}</h2><label className="proof-search"><Search size={17} /><input aria-label="Ieškoti agentūros arba kliento" placeholder="Agentūra arba klientas…" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} /></label></div>
+      <div className="proof-rows">
+        {visibleAgencies.map(agency => <div key={agency.id} className="proof-row"><Link href={`/admin/agencies/${agency.id}`} className="proof-entry"><span className="proof-folder"><Folder size={25} /></span><div><h2>{agency.name}</h2><p>Klientų katalogų: {clients.filter(client => client.agency_id === agency.id).length}</p></div><ChevronRight size={20} /></Link><div className="proof-actions"><button onClick={() => copyToClipboard(agency.unique_slug)} className="proof-icon" title="Kopijuoti viešą nuorodą" aria-label={`Kopijuoti ${agency.name} nuorodą`}>{copiedSlug === agency.unique_slug ? <Check size={18} /> : <Copy size={18} />}</button><Link href={`/admin/agencies/${agency.id}/edit`} className="proof-icon" title="Redaguoti" aria-label={`Redaguoti ${agency.name}`}><Edit size={18} /></Link><button onClick={() => handleDeleteAgency(agency.id)} className="proof-icon proof-danger" title="Ištrinti" aria-label={`Ištrinti ${agency.name}`}><Trash2 size={18} /></button></div></div>)}
+        {normalizedSearchTerm && filteredClients.map(client => <div key={client.id} className="proof-row"><Link className="proof-entry" href={`/admin/clients/${client.id}`}><span className="proof-folder"><Folder size={25} /></span><div><h2>{client.name}</h2><p>{getAgencyName(client)} · Kliento katalogas</p></div><ChevronRight size={20} /></Link></div>)}
       </div>
-
-      <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-        <div className="relative max-w-2xl">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Ieškoti kliento katalogo arba agentūros..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
-        </div>
-      </div>
-
-      {normalizedSearchTerm ? (
-        filteredClients.length === 0 ? (
-          <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
-            <div className="text-gray-300 mb-6">
-              <Square className="mx-auto h-16 w-16" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-3">Klientų nerasta</h3>
-            <p className="text-gray-500 text-lg">Pabandykite įvesti kitą kliento ar agentūros pavadinimą</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-            <ul className="divide-y divide-gray-100">
-              {filteredClients.map((client) => (
-                <li key={client.id} className="hover:bg-gray-50/90 transition-colors group">
-                  <Link
-                    href={`/admin/clients/${client.id}`}
-                    className="flex items-center gap-4 px-5 py-4 min-w-0"
-                  >
-                    <div className="rounded-lg bg-indigo-50 p-2 text-indigo-600 shrink-0">
-                      <Square className="h-5 w-5" strokeWidth={1.75} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 truncate" title={client.name}>
-                        {client.name}
-                      </p>
-                      <p className="text-sm text-gray-500 truncate" title={getAgencyName(client) || undefined}>
-                        {getAgencyName(client) || 'Be agentūros'}
-                      </p>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 shrink-0 transition-colors" aria-hidden />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )
-      ) : agencies.length === 0 ? (
-        <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
-          <div className="text-gray-300 mb-6">
-            <Users className="mx-auto h-16 w-16" />
-          </div>
-          <h3 className="text-xl font-semibold text-gray-800 mb-3">Nėra katalogų</h3>
-          <p className="text-gray-500 text-lg mb-4">Pradėkite pridėdami pirmą katalogą</p>
-          <div className="relative inline-block">
-            <button
-              onClick={() => setShowDropdown(!showDropdown)}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Naujas
-              <ChevronDown className="h-4 w-4 ml-2" />
-            </button>
-            
-            {showDropdown && (
-              <>
-                <div 
-                  className="fixed inset-0 z-10" 
-                  onClick={() => setShowDropdown(false)}
-                />
-                <div className="absolute left-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-20">
-                  <button
-                    onClick={() => {
-                      setShowDropdown(false)
-                      showAgencyModal()
-                    }}
-                    className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
-                  >
-                    <Building2 className="h-4 w-4 mr-3 text-indigo-600" />
-                    Katalogas
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowDropdown(false)
-                      showPhotoModal()
-                    }}
-                    className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-100 transition-colors flex items-center"
-                  >
-                    <Plus className="h-4 w-4 mr-3 text-green-600" />
-                    Įkelti foto
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-          {agencies.map((agency) => (
-            <div key={agency.id} className="group relative">
-              {/* Action buttons - top right */}
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    copyToClipboard(agency.unique_slug)
-                  }}
-                  className="p-1.5 bg-white text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors shadow-md"
-                  title="Kopijuoti nuorodą"
-                >
-                  {copiedSlug === agency.unique_slug ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </button>
-                <Link
-                  href={`/admin/agencies/${agency.id}/edit`}
-                  className="p-1.5 bg-white text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors shadow-md"
-                  title="Redaguoti"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Edit className="h-4 w-4" />
-                </Link>
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    handleDeleteAgency(agency.id)
-                  }}
-                  className="p-1.5 bg-white text-red-600 hover:bg-red-50 rounded-lg transition-colors shadow-md"
-                  title="Ištrinti"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-
-              <Link href={`/admin/agencies/${agency.id}`}>
-                <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6 text-center cursor-pointer border border-gray-100 hover:border-indigo-300">
-                  <div className="mb-4">
-                    <img src="/Folder.png" alt="Katalogas" className="mx-auto h-16 w-16" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-1 truncate" title={agency.name}>
-                    {agency.name}
-                  </h3>
-                </div>
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
+      {!visibleAgencies.length && (!normalizedSearchTerm || !filteredClients.length) && <div className="proof-empty"><Folder size={34} /><h2>{normalizedSearchTerm ? 'Rezultatų nerasta' : 'Dar nėra agentūrų'}</h2><p>{normalizedSearchTerm ? 'Pabandykite kitą pavadinimą.' : 'Pridėkite pirmą agentūrą viršuje esančiu mygtuku.'}</p></div>}
     </div>
   )
 }

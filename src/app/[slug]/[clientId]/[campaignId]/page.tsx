@@ -1,13 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Client, Campaign, Photo } from '@/types/database'
-import { Download, Image as ImageIcon, DownloadCloud, ChevronRight, X, ChevronLeft } from 'lucide-react'
+import { ArrowDownToLine, Image as ImageIcon, DownloadCloud, ChevronRight, X, ChevronLeft } from 'lucide-react'
 import JSZip from 'jszip'
 import Link from 'next/link'
-import { FeatureSuggestionSection } from '@/components/FeatureSuggestionSection'
+import { isPhotoNew, markPhotosViewed } from '@/lib/photo-visit-state'
+import { useIsEmbedded } from '@/lib/use-is-embedded'
 
 interface PhotoWithCampaign extends Photo {
   campaign: Campaign
@@ -25,6 +26,7 @@ export default function CampaignPublicPage() {
   const slug = params.slug as string
   const clientId = params.clientId as string
   const campaignId = params.campaignId as string
+  const embedded = useIsEmbedded()
   
   const [agency, setAgency] = useState<Agency | null>(null)
   const [client, setClient] = useState<Client | null>(null)
@@ -34,15 +36,14 @@ export default function CampaignPublicPage() {
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoWithCampaign | null>(null)
   const [newPhotoIds, setNewPhotoIds] = useState<Set<string>>(new Set())
 
+  const [downloadProgress, setDownloadProgress] = useState<number | null>(null)
+  const downloadBusy = useRef(false)
+  const swipe = useRef<{ x: number; y: number } | null>(null)
+
   useEffect(() => {
     if (slug && clientId && campaignId) {
       fetchData()
       
-      // Update last visit date when page is opened
-      const lastVisitsKey = `last_visits_${clientId}`
-      const lastVisits = JSON.parse(localStorage.getItem(lastVisitsKey) || '{}')
-      lastVisits[campaignId] = new Date().toISOString()
-      localStorage.setItem(lastVisitsKey, JSON.stringify(lastVisits))
     }
   }, [slug, clientId, campaignId])
 
@@ -50,51 +51,12 @@ export default function CampaignPublicPage() {
   useEffect(() => {
     if (photos.length === 0) return
 
-    const viewedPhotosKey = `viewed_photos_${clientId}_${campaignId}`
-    const viewedPhotos = JSON.parse(localStorage.getItem(viewedPhotosKey) || '[]')
-    const viewedSet = new Set(viewedPhotos)
-
-    const lastVisitsKey = `last_visits_${clientId}`
-    const lastVisits = JSON.parse(localStorage.getItem(lastVisitsKey) || '{}')
-    let lastVisit = lastVisits[campaignId]
-
-    // If first visit, set baseline to today (so no old photos show as NEW)
-    if (!lastVisit) {
-      lastVisit = new Date().toISOString()
-      lastVisits[campaignId] = lastVisit
-      localStorage.setItem(lastVisitsKey, JSON.stringify(lastVisits))
-    }
-
-    const newIds = new Set<string>()
-    const visitDate = new Date(lastVisit)
-    
-    photos.forEach(photo => {
-      const photoDate = new Date(photo.created_at)
-      // Photo is new ONLY if:
-      // 1. It was created after last visit
-      // 2. It hasn't been viewed yet
-      if (photoDate > visitDate && !viewedSet.has(photo.id)) {
-        newIds.add(photo.id)
-      }
-    })
-    
-    setNewPhotoIds(newIds)
+    setNewPhotoIds(new Set(photos.filter(photo => isPhotoNew(clientId, campaignId, photo)).map(photo => photo.id)))
   }, [photos, clientId, campaignId])
 
-  // Helper function to mark photo as viewed
   const markPhotoAsViewed = (photoId: string) => {
-    const viewedPhotosKey = `viewed_photos_${clientId}_${campaignId}`
-    const viewedPhotos = JSON.parse(localStorage.getItem(viewedPhotosKey) || '[]')
-    if (!viewedPhotos.includes(photoId)) {
-      viewedPhotos.push(photoId)
-      localStorage.setItem(viewedPhotosKey, JSON.stringify(viewedPhotos))
-      // Remove from new photos set
-      setNewPhotoIds(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(photoId)
-        return newSet
-      })
-    }
+    markPhotosViewed(clientId, campaignId, [photoId])
+    setNewPhotoIds(previous => { const next = new Set(previous); next.delete(photoId); return next })
   }
 
   const navigateToPrevious = () => {
@@ -224,15 +186,17 @@ export default function CampaignPublicPage() {
   }
 
   const handleDownload = async (photo: PhotoWithCampaign) => {
+    if (downloadBusy.current) return
+    downloadBusy.current = true
+    setDownloadProgress(0)
     try {
-      // Mark photo as viewed when downloading
-      markPhotoAsViewed(photo.id)
       
       const extension = photo.original_name.split('.').pop() || 'jpg'
       const uploadDate = new Date(photo.created_at).toISOString().split('T')[0]
       const newFilename = `Piksel_${client?.name}_${campaign?.name}_${uploadDate}.${extension}`
       
       const response = await fetch(photo.url)
+      if (!response.ok) throw new Error('Nuotrauka nepasiekiama')
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       
@@ -243,50 +207,40 @@ export default function CampaignPublicPage() {
       a.click()
       document.body.removeChild(a)
       
-      window.URL.revokeObjectURL(url)
+      markPhotoAsViewed(photo.id)
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 30000)
     } catch (error) {
       console.error('Error downloading photo:', error)
       alert('Klaida atsisiunčiant nuotrauką')
-    }
+    } finally { downloadBusy.current = false; setDownloadProgress(null) }
   }
 
-  const handleDownloadAll = async () => {
-    if (photos.length === 0) return
-    
+  const handleDownloadAll = async (selection: PhotoWithCampaign[] = photos) => {
+    if (!selection.length || downloadBusy.current) return
+    downloadBusy.current = true
+    setDownloadProgress(0)
     try {
-      // Mark all photos as viewed when downloading all
-      photos.forEach(photo => markPhotoAsViewed(photo.id))
-      
       const zip = new JSZip()
-      
-      for (let i = 0; i < photos.length; i++) {
-        const photo = photos[i]
-        const extension = photo.original_name.split('.').pop() || 'jpg'
-        const uploadDate = new Date(photo.created_at).toISOString().split('T')[0]
-        const newFilename = `Piksel_${client?.name}_${campaign?.name}_${uploadDate}_${i + 1}.${extension}`
-        
+      for (let i = 0; i < selection.length; i++) {
+        const photo = selection[i]
         const response = await fetch(photo.url)
-        const blob = await response.blob()
-        zip.file(newFilename, blob)
+        if (!response.ok) throw new Error('Nuotrauka nepasiekiama')
+        const extension = photo.original_name.split('.').pop() || 'jpg'
+        zip.file(`Piksel_${i + 1}_${photo.id}.${extension}`, await response.blob())
+        setDownloadProgress(Math.round((i + 1) / selection.length * 75))
       }
-      
-      const zipBlob = await zip.generateAsync({ type: 'blob' })
-      const url = window.URL.createObjectURL(zipBlob)
-      const uploadDate = new Date(photos[0].created_at).toISOString().split('T')[0]
-      const zipFilename = `Piksel_${client?.name}_${campaign?.name}_${uploadDate}.zip`
-      
-      const a = document.createElement('a')
-      a.href = url
-      a.download = zipFilename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      
-      window.URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error('Error downloading all photos:', error)
-      alert('Klaida atsisiunčiant nuotraukas')
-    }
+      const blob = await zip.generateAsync({ type: 'blob' }, meta => setDownloadProgress(Math.round(75 + meta.percent / 4)))
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      const date = new Date(selection[0].created_at).toISOString().split('T')[0]
+      anchor.download = `Piksel_${client?.name}_${campaign?.name}_${date}.zip`.replace(/[\\/:*?"<>|]/g, '-')
+      document.body.appendChild(anchor); anchor.click(); anchor.remove()
+      selection.forEach(photo => markPhotoAsViewed(photo.id))
+      window.setTimeout(() => URL.revokeObjectURL(url), 30000)
+    } catch {
+      alert('Nepavyko paruošti archyvo. Bandykite dar kartą.')
+    } finally { downloadBusy.current = false; setDownloadProgress(null) }
   }
 
   if (loading) {
@@ -302,28 +256,34 @@ export default function CampaignPublicPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="shrink-0 bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center">
-            <img
-              src="/Piksel-logo-juodas-2026.png"
-              alt="Piksel"
-              className="h-8 w-auto"
-            />
+    <div className="proof-public min-h-screen bg-white text-[#191919] flex flex-col">
+      {!embedded && (
+        <header className="shrink-0 bg-[#f7f7f2] border-b border-black/10">
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center justify-between">
+              <img
+                src="/Piksel-logo-juodas-2026.png"
+                alt="Piksel"
+                className="h-8 w-auto"
+              />
+              <span className="text-[12px] font-semibold uppercase tracking-[0.22em] text-gray-500">Photo Proof</span>
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <div className="flex-1 flex flex-col max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 min-h-0">
+      <div
+        className={`flex-1 flex flex-col max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 min-h-0 ${
+          embedded ? 'py-4' : 'py-8'
+        }`}
+      >
         {/* Breadcrumb */}
-        <div className="flex items-center text-sm text-gray-600 mb-6 shrink-0">
-          <Link href={`/${slug}`} className="hover:text-indigo-600">
+        <div data-embedded={embedded} className="proof-breadcrumb flex flex-wrap items-center gap-y-2 text-xs text-gray-500 mb-10 shrink-0">
+          <Link href={`/${slug}`} className="hover:text-black">
             {agency.name}
           </Link>
           <ChevronRight className="h-4 w-4 mx-2" />
-          <Link href={`/${slug}/${clientId}`} className="hover:text-indigo-600">
+          <Link href={`/${slug}/${clientId}`} className="hover:text-black">
             {client.name}
           </Link>
           <ChevronRight className="h-4 w-4 mx-2" />
@@ -332,35 +292,24 @@ export default function CampaignPublicPage() {
 
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex-1 min-h-0">
-            {/* Campaign Info & Controls */}
-            <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-6">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">{campaign.name}</h1>
-                  {campaign.description && (
-                    <p className="text-gray-600 mt-1">{campaign.description}</p>
-                  )}
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="bg-indigo-100 px-4 py-2 rounded-lg h-10 flex items-center">
-                    <p className="text-sm text-indigo-600 font-medium">
-                      {photos.length} {photos.length === 1 ? 'nuotrauka' : 'nuotraukos'}
-                    </p>
-                  </div>
-                  
-                  {photos.length > 0 && (
-                    <button
-                      onClick={handleDownloadAll}
-                      className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm h-10"
-                    >
-                      <DownloadCloud className="h-4 w-4 mr-2" />
-                      <span className="text-sm font-medium">Atsisiųsti visas ({photos.length})</span>
-                    </button>
-                  )}
+            <div className="mb-10 flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between border-b border-black/10 pb-8">
+              <div className="min-w-0 max-w-3xl">
+                <p className="mb-4 text-[14px] font-semibold uppercase tracking-[0.2em] text-gray-500">KAMPANIJOS GALERIJA</p>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-medium tracking-[-0.045em] leading-[1.12] text-[#20231d] break-words">{client.name}</h1><p className="mt-3 text-base text-gray-600">{campaign.name}</p>
+                {campaign.description && <p className="mt-4 text-sm leading-relaxed text-gray-500">{campaign.description}</p>}
+                <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-gray-500">
+                  <span className="inline-flex items-center gap-2"><ImageIcon className="h-4 w-4" />Nuotraukos: {photos.length}</span>
+                  {photos[0] && <span>Atnaujinta {new Date(photos[0].created_at).toLocaleDateString('lt-LT')}</span>}
                 </div>
               </div>
+              {photos.length > 0 && (
+                <button disabled={downloadProgress !== null} onClick={() => handleDownloadAll()} className="inline-flex shrink-0 items-center justify-center gap-3 rounded-full bg-[#242820] px-6 py-4 text-sm font-medium text-white transition-colors hover:bg-[#424b36] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#242820]">
+                  <DownloadCloud className="h-4 w-4" /> Atsisiųsti visas <span className="text-white/50">ZIP · {photos.length}</span>
+                </button>
+              )}
             </div>
 
+            {downloadProgress !== null && <div className="proof-download-progress" role="status">Ruošiama <progress max={100} value={downloadProgress} aria-label="Atsisiuntimo paruošimas" />{downloadProgress}%</div>}
             {/* Photos Grid */}
             {photos.length === 0 ? (
               <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
@@ -373,87 +322,36 @@ export default function CampaignPublicPage() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {photos.map((photo) => (
-                  <div key={photo.id} className="bg-white rounded-lg shadow-sm overflow-hidden group cursor-pointer">
-                    <div 
-                      className="relative bg-gray-100" 
-                      style={{ aspectRatio: '3/2' }}
-                      onClick={() => {
-                        setSelectedPhoto(photo)
-                        // Mark photo as viewed when opened
-                        markPhotoAsViewed(photo.id)
-                      }}
-                    >
-                      <img
-                        src={photo.url}
-                        alt={photo.original_name}
-                        className="w-full h-full object-cover"
-                      />
-                      {/* New photo badge */}
-                      {newPhotoIds.has(photo.id) && (
-                        <div className="absolute top-2 left-2">
-                          <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-lg">
-                            NEW
-                          </span>
-                        </div>
-                      )}
-                      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleDownload(photo)
-                          }}
-                          className="p-2 bg-white bg-opacity-90 rounded-lg hover:bg-opacity-100 transition-colors shadow-sm"
-                          title="Atsisiųsti nuotrauką"
-                        >
-                          <Download className="h-4 w-4 text-gray-700" />
-                        </button>
-                      </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-9">
+                {photos.map((photo, index) => (
+                  <article key={photo.id} className="group min-w-0">
+                    <div className="relative overflow-hidden rounded-xl bg-[#e8e9e2]">
+                      <button type="button" onClick={() => { setSelectedPhoto(photo); markPhotoAsViewed(photo.id) }} aria-label={`Peržiūrėti ${photo.original_name}`} className="block w-full aspect-[3/2] overflow-hidden focus-visible:outline-2 focus-visible:outline-offset-[-4px] focus-visible:outline-white">
+                        <img src={photo.url} alt={photo.original_name} loading="lazy" className="h-full w-full object-cover transition-transform duration-500 motion-safe:group-hover:scale-[1.025]" />
+                      </button>
+                      {newPhotoIds.has(photo.id) && <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-[#e2efad] px-3 py-1.5 text-[12px] font-semibold uppercase tracking-wider text-[#29301d]">Nauja</span>}
+                      <button type="button" disabled={downloadProgress !== null} onClick={() => handleDownload(photo)} className="absolute bottom-[20px] right-[20px] inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-white/20 bg-black text-white transition-colors hover:bg-[#1a1a1a] focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50" aria-label={`Atsisiųsti ${photo.original_name}`}><ArrowDownToLine className="h-[14px] w-[14px]" /></button>
                     </div>
-                    <div className="p-4">
-                      <h3 className="font-medium text-gray-900 truncate" title={photo.original_name}>
-                        {photo.original_name}
-                      </h3>
-                      <div className="flex justify-between items-center mt-2">
-                        <span className="text-xs text-gray-500">
-                          {new Date(photo.created_at).toLocaleDateString('lt-LT')}
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-3 pt-3.5">
+                      <span className="text-[12px] tabular-nums text-gray-400">{String(index + 1).padStart(2, '0')}</span>
+                      <p className="text-[14px] text-gray-500">{new Date(photo.created_at).toLocaleDateString('lt-LT')}</p>
                     </div>
-                  </div>
+                  </article>
                 ))}
               </div>
             )}
           </div>
 
-          <FeatureSuggestionSection
-            agencySlug={slug}
-            context="campaign"
-            clientId={clientId}
-            clientName={client.name}
-            campaignId={campaignId}
-            campaignName={campaign.name}
-          />
         </div>
       </div>
 
       {/* Photo Modal */}
       {selectedPhoto && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+          className="fixed inset-0 bg-black/95 flex items-center justify-center z-50 p-4"
           onClick={() => setSelectedPhoto(null)}
         >
-          <div
-            className="absolute top-[30px] left-[30px] z-[60]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img
-              src="/Piksel-logo-baltas-2026.png"
-              alt="Piksel"
-              className="h-8 w-auto drop-shadow-md"
-            />
-          </div>
+          <div className="proof-thumbnails" onClick={e => e.stopPropagation()}>{photos.map(photo => <button key={photo.id} aria-label={`Rodyti ${photo.original_name}`} aria-pressed={selectedPhoto.id === photo.id} onClick={() => setSelectedPhoto(photo)}><img src={photo.url} alt="" /></button>)}</div>
           <div className="relative max-w-7xl max-h-full w-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
             {/* Navigation buttons (šalia „dėžės“, ne ant pačios nuotraukos krašto) */}
             {photos.length > 1 && (
@@ -463,7 +361,7 @@ export default function CampaignPublicPage() {
                     e.stopPropagation()
                     navigateToPrevious()
                   }}
-                  className="absolute left-0 sm:left-2 md:left-4 top-1/2 -translate-y-1/2 p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors z-10 shadow-lg"
+                  className="absolute left-0 sm:left-2 md:left-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 rounded-full transition-colors z-10 shadow-lg"
                   title="Ankstesnė nuotrauka (←)"
                 >
                   <ChevronLeft className="h-5 w-5 text-white stroke-2" />
@@ -473,7 +371,7 @@ export default function CampaignPublicPage() {
                     e.stopPropagation()
                     navigateToNext()
                   }}
-                  className="absolute right-0 sm:right-2 md:right-4 top-1/2 -translate-y-1/2 p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors z-10 shadow-lg"
+                  className="absolute right-0 sm:right-2 md:right-4 top-1/2 -translate-y-1/2 p-2 bg-black/60 hover:bg-black/80 rounded-full transition-colors z-10 shadow-lg"
                   title="Kita nuotrauka (→)"
                 >
                   <ChevronRight className="h-5 w-5 text-white stroke-2" />
@@ -481,47 +379,42 @@ export default function CampaignPublicPage() {
               </>
             )}
 
-            {/* Konteineris sutampa su nuotraukos matmenimis — skaitiklis ir mygtukai ant foto; logotipas virš juodo fono */}
-            <div className="relative inline-block max-h-[min(85vh,calc(100vh-4rem))] max-w-full">
+            {/* Juoda valdymo juosta virš nuotraukos neuždengia jos turinio. */}
+            <div className="relative inline-block max-w-full overflow-hidden rounded-lg bg-black">
+              <div className="grid grid-cols-[minmax(96px,1fr)_minmax(0,96px)_minmax(96px,1fr)] items-center bg-black p-5 text-white" role="toolbar" aria-label="Nuotraukos valdymas">
+                <span className="justify-self-start rounded-lg border border-white/20 px-3 py-1.5 text-sm font-medium tabular-nums" aria-live="polite">
+                  {photos.findIndex((p) => p.id === selectedPhoto.id) + 1} / {photos.length}
+                </span>
+                <img src="/Piksel-logo-baltas-2026.png" alt="Piksel" className="block h-auto w-full max-w-24 justify-self-center" />
+                <div className="flex gap-2 justify-self-end">
+                  <button
+                    type="button"
+                    disabled={downloadProgress !== null}
+                    onClick={() => handleDownload(selectedPhoto)}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-white/20 bg-black text-white transition-colors hover:bg-white/10 disabled:opacity-50"
+                    aria-label="Atsisiųsti nuotrauką"
+                    title="Atsisiųsti nuotrauką"
+                  >
+                    <ArrowDownToLine className="h-[14px] w-[14px] stroke-2" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPhoto(null)}
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-white/20 bg-black text-white transition-colors hover:bg-white/10"
+                    aria-label="Uždaryti"
+                    title="Uždaryti (ESC)"
+                  >
+                    <X className="h-5 w-5 stroke-2" />
+                  </button>
+                </div>
+              </div>
               <img
+                onTouchStart={e => { swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }}
+                onTouchEnd={e => { if (!swipe.current) return; const dx = e.changedTouches[0].clientX - swipe.current.x; const dy = e.changedTouches[0].clientY - swipe.current.y; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) { if (dx < 0) navigateToNext(); else navigateToPrevious() } swipe.current = null }}
                 src={selectedPhoto.url}
                 alt={selectedPhoto.original_name}
-                className="block max-h-[min(85vh,calc(100vh-4rem))] max-w-full w-auto h-auto object-contain rounded-lg"
+                className="block max-h-[max(100px,calc(100svh-264px))] max-w-full w-auto h-auto object-contain rounded-b-lg"
               />
-
-              {photos.length > 1 && (
-                <div
-                  className="absolute top-3 left-3 z-[60]"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="px-3 py-1.5 bg-black rounded-lg">
-                    <p className="text-white text-sm font-medium">
-                      {photos.findIndex((p) => p.id === selectedPhoto.id) + 1} /{' '}
-                      {photos.length}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              <div className="absolute top-3 right-3 flex gap-2 z-[60]" onClick={(e) => e.stopPropagation()}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDownload(selectedPhoto)
-                  }}
-                  className="p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors shadow-lg"
-                  title="Atsisiųsti nuotrauką"
-                >
-                  <Download className="h-5 w-5 text-white stroke-2" />
-                </button>
-                <button
-                  onClick={() => setSelectedPhoto(null)}
-                  className="p-2 bg-black bg-opacity-60 hover:bg-opacity-80 rounded-full transition-colors shadow-lg"
-                  title="Uždaryti (ESC)"
-                >
-                  <X className="h-5 w-5 text-white stroke-2" />
-                </button>
-              </div>
             </div>
           </div>
         </div>

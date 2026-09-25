@@ -6,12 +6,13 @@ import { supabase } from '@/lib/supabase'
 import { Client, Campaign } from '@/types/database'
 import { Clock, Folder, Image as ImageIcon, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
-import { FeatureSuggestionSection } from '@/components/FeatureSuggestionSection'
 import {
   campaignActivityIso,
   campaignActivityTime,
   formatActivityPrimary,
 } from '@/lib/activity-dates'
+import { isPhotoNew } from '@/lib/photo-visit-state'
+import { useIsEmbedded } from '@/lib/use-is-embedded'
 
 interface Agency {
   id: string
@@ -24,11 +25,13 @@ export default function ClientPublicPage() {
   const router = useRouter()
   const slug = params.slug as string
   const clientId = params.clientId as string
+  const embedded = useIsEmbedded()
   
   const [agency, setAgency] = useState<Agency | null>(null)
   const [client, setClient] = useState<Client | null>(null)
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
+  const [onlyNew, setOnlyNew] = useState(false)
   const [campaignPhotoCounts, setCampaignPhotoCounts] = useState<Record<string, number>>({})
   const [newPhotosCount, setNewPhotosCount] = useState<Record<string, number>>({})
   const [campaignLastPhotoAt, setCampaignLastPhotoAt] = useState<
@@ -103,10 +106,6 @@ export default function ClientPublicPage() {
           const newCounts: Record<string, number> = {}
           const lastPhotoAt: Record<string, string> = {}
 
-          const lastVisitsKey = `last_visits_${clientId}`
-          const lastVisits = JSON.parse(localStorage.getItem(lastVisitsKey) || '{}')
-          const today = new Date().toISOString()
-
           photos.forEach((photo) => {
             counts[photo.campaign_id] = (counts[photo.campaign_id] || 0) + 1
 
@@ -114,24 +113,7 @@ export default function ClientPublicPage() {
               lastPhotoAt[photo.campaign_id] = photo.created_at
             }
 
-            let lastVisit = lastVisits[photo.campaign_id]
-            if (!lastVisit) {
-              lastVisit = today
-              lastVisits[photo.campaign_id] = lastVisit
-              localStorage.setItem(lastVisitsKey, JSON.stringify(lastVisits))
-            }
-
-            const photoDate = new Date(photo.created_at)
-            const visitDate = new Date(lastVisit)
-            const isNewByDate = photoDate > visitDate
-
-            const viewedPhotosKey = `viewed_photos_${clientId}_${photo.campaign_id}`
-            const viewedPhotos = JSON.parse(
-              localStorage.getItem(viewedPhotosKey) || '[]'
-            )
-            const isViewed = viewedPhotos.includes(photo.id)
-
-            if (isNewByDate && !isViewed) {
+            if (isPhotoNew(clientId, photo.campaign_id, photo)) {
               newCounts[photo.campaign_id] = (newCounts[photo.campaign_id] || 0) + 1
             }
           })
@@ -182,23 +164,28 @@ export default function ClientPublicPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="shrink-0 bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center">
-            <img
-              src="/Piksel-logo-juodas-2026.png"
-              alt="Piksel"
-              className="h-8 w-auto"
-            />
+    <div className="proof-public min-h-screen bg-white flex flex-col">
+      {!embedded && (
+        <header className="shrink-0 bg-white shadow-sm border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="flex items-center">
+              <img
+                src="/Piksel-logo-juodas-2026.png"
+                alt="Piksel"
+                className="h-8 w-auto"
+              />
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
-      <div className="flex-1 flex flex-col max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 min-h-0">
+      <div
+        className={`flex-1 flex flex-col max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 min-h-0 ${
+          embedded ? 'py-4' : 'py-8'
+        }`}
+      >
         {/* Breadcrumb */}
-        <div className="flex items-center text-sm text-gray-600 mb-6 shrink-0">
+        <div data-embedded={embedded} className="proof-breadcrumb flex items-center text-sm text-gray-600 mb-6 shrink-0">
           <Link href={`/${slug}`} className="hover:text-indigo-600">
             {agency.name}
           </Link>
@@ -208,6 +195,9 @@ export default function ClientPublicPage() {
 
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex-1 min-h-0">
+            <div className="proof-public-heading"><h1>{client.name}</h1><p>Kampanijos ir jų nuotraukos</p></div>
+            <div className="proof-new-filter"><span>Kampanijų su naujomis nuotraukomis: {Object.values(newPhotosCount).filter(count => count > 0).length}</span><button aria-pressed={onlyNew} onClick={() => setOnlyNew(!onlyNew)}>{onlyNew ? 'Rodyti visas' : 'Tik su naujomis'}</button></div>
+            {onlyNew && !Object.values(newPhotosCount).some(count => count > 0) && <p className="py-8 text-gray-600">Naujų nuotraukų nėra.</p>}
             {/* Kampanijų sąrašas */}
             {campaigns.length === 0 ? (
               <div className="bg-white p-12 rounded-2xl shadow-lg border border-gray-100 text-center">
@@ -222,7 +212,7 @@ export default function ClientPublicPage() {
             ) : (
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                 <ul className="divide-y divide-gray-100">
-                  {sortedCampaigns.map((campaign) => {
+                  {sortedCampaigns.filter(c => !onlyNew || newPhotosCount[c.id] > 0).map((campaign) => {
                     const activityIso = campaignActivityIso(campaign, campaignLastPhotoAt)
                     const activityTs = campaignActivityTime(campaign, campaignLastPhotoAt)
                     const isNewest =
@@ -236,14 +226,14 @@ export default function ClientPublicPage() {
                             isNewest ? 'bg-indigo-50/40 ring-inset ring-1 ring-indigo-100' : ''
                           }`}
                         >
-                          <div className="flex-1 min-w-0 text-left">
+                          <div className="flex-1 min-w-0 text-left"><p className="proof-public-title mb-2">{client.name}</p>
                             <div className="flex flex-wrap items-center gap-2 gap-y-1">
                               {isNewest && (
                                 <span className="shrink-0 rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
                                   Naujausia
                                 </span>
                               )}
-                              <p className="font-semibold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">
+                              <p className="text-base text-gray-600 break-words">
                                 {campaign.name}
                               </p>
                             </div>
@@ -294,14 +284,6 @@ export default function ClientPublicPage() {
             )}
           </div>
 
-          {agency && client && (
-            <FeatureSuggestionSection
-              agencySlug={slug}
-              context="client"
-              clientId={client.id}
-              clientName={client.name}
-            />
-          )}
         </div>
       </div>
     </div>

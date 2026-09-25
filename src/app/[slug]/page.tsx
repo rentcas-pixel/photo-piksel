@@ -6,8 +6,9 @@ import { supabase } from '@/lib/supabase'
 import { Campaign, Client } from '@/types/database'
 import Link from 'next/link'
 import { ChevronRight, Clock, Folder, Image as ImageIcon, Search } from 'lucide-react'
-import { FeatureSuggestionSection } from '@/components/FeatureSuggestionSection'
 import { CampaignCoverView } from '@/components/CampaignCoverView'
+import { isPhotoNew } from '@/lib/photo-visit-state'
+import { useIsEmbedded } from '@/lib/use-is-embedded'
 import { formatCatalogCount } from '@/lib/catalog-label'
 import { formatUploadedDate } from '@/lib/resolve-share-code'
 import {
@@ -35,12 +36,16 @@ export default function AgencyPublicPage() {
   const params = useParams()
   const router = useRouter()
   const slug = params.slug as string
+  const embedded = useIsEmbedded()
 
   const [agency, setAgency] = useState<Agency | null>(null)
   const [clients, setClients] = useState<Client[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [onlyNew, setOnlyNew] = useState(false)
+  const [newCounts, setNewCounts] = useState<Record<string, number>>({})
+  const [newClientIds, setNewClientIds] = useState<string[]>([])
   const [clientPhotoCounts, setClientPhotoCounts] = useState<Record<string, number>>({})
   const [clientLastUpdated, setClientLastUpdated] = useState<Record<string, string>>({})
   const [campaignPhotoCounts, setCampaignPhotoCounts] = useState<Record<string, number>>({})
@@ -124,6 +129,7 @@ export default function AgencyPublicPage() {
       const { data: photos } = (await supabase
         .from('photos')
         .select(`
+          id,
           campaign_id,
           created_at,
           campaign:campaigns(client_id)
@@ -135,10 +141,13 @@ export default function AgencyPublicPage() {
         const clientLast: Record<string, string> = {}
         const campCounts: Record<string, number> = {}
         const campLast: Record<string, string> = {}
+        const unread: Record<string, number> = {}
+        const unreadClients = new Set<string>()
         let latestAgency: string | null = null
 
         photos.forEach((photo: unknown) => {
           const row = photo as {
+            id: string
             campaign_id: string
             campaign?: { client_id?: string }
             created_at: string
@@ -147,6 +156,7 @@ export default function AgencyPublicPage() {
           const campaignId = row.campaign_id
           if (!clientId || !clientIds.has(clientId)) return
 
+          if (isPhotoNew(clientId, campaignId, row)) { unread[campaignId] = (unread[campaignId] || 0) + 1; unreadClients.add(clientId) }
           clientCounts[clientId] = (clientCounts[clientId] || 0) + 1
           campCounts[campaignId] = (campCounts[campaignId] || 0) + 1
 
@@ -158,6 +168,8 @@ export default function AgencyPublicPage() {
           }
         })
 
+        setNewCounts(unread)
+        setNewClientIds([...unreadClients])
         setClientPhotoCounts(clientCounts)
         setClientLastUpdated(clientLast)
         setCampaignPhotoCounts(campCounts)
@@ -245,17 +257,22 @@ export default function AgencyPublicPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <CampaignCoverView
-        title={agency.name}
-        subtitleLines={coverSubtitleLines}
-        action={{ label: 'Peržiūrėti katalogus', onClick: scrollToCatalogs }}
-      />
+    <div className="min-h-screen bg-white">
+      {!embedded && (
+        <CampaignCoverView
+          title={agency.name}
+          subtitleLines={coverSubtitleLines}
+          action={{ label: 'Peržiūrėti katalogus', onClick: scrollToCatalogs }}
+        />
+      )}
 
       <section
         id={CATALOGS_SECTION_ID}
-        className="scroll-mt-4 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8"
+        className={`proof-public scroll-mt-4 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 ${embedded ? 'py-4' : 'py-8'}`}
       >
+        <div className="proof-public-heading"><h1>Klientų katalogai</h1><p>{agency.name} · Pasirinkite klientą ir jo kampaniją.</p></div>
+        <div className="proof-new-filter"><span>Kampanijų su naujomis nuotraukomis: {Object.keys(newCounts).length}</span><button aria-pressed={onlyNew} onClick={() => setOnlyNew(!onlyNew)}>{onlyNew ? 'Rodyti visus katalogus' : 'Tik su naujomis'}</button></div>
+        {onlyNew && !newClientIds.length && <p className="py-6 text-gray-600">Naujų nuotraukų nėra.</p>}
         {showSearch && (
           <div className="mb-6">
             <label htmlFor="agency-search" className="sr-only">
@@ -300,7 +317,7 @@ export default function AgencyPublicPage() {
                 </h2>
                 <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
                   <ul className="divide-y divide-gray-100">
-                    {filteredCampaigns.map((campaign) => {
+                    {filteredCampaigns.filter(c => !onlyNew || newCounts[c.id] > 0).map((campaign) => {
                       const catalog = clientById.get(campaign.client_id)
                       const activityIso = campaignActivityIso(campaign, campaignLastPhotoAt)
 
@@ -355,7 +372,7 @@ export default function AgencyPublicPage() {
                     Katalogai
                   </h2>
                 )}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                <div className="proof-catalogs">
                   {(normalizedSearch ? filteredClients : sortedClients).map((client) => {
                     const activityIso = clientActivityIso(client, clientLastUpdated)
                     const activityTs = clientActivityTime(client, clientLastUpdated)
@@ -413,9 +430,6 @@ export default function AgencyPublicPage() {
           </div>
         )}
 
-        <div className="mt-10">
-          <FeatureSuggestionSection agencySlug={slug} context="agency_home" />
-        </div>
       </section>
     </div>
   )

@@ -1,5 +1,7 @@
 'use client'
 
+import './admin-design.css'
+import Link from 'next/link'
 import { useAuth } from '@/components/AuthProvider'
 import { useRouter } from 'next/navigation'
 import { 
@@ -29,7 +31,7 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, signOut } = useAuth()
+  const { user, loading: authLoading, signOut } = useAuth()
   const router = useRouter()
   
   // Modal states
@@ -65,8 +67,10 @@ export default function AdminLayout({
   }
 
   useEffect(() => {
-    console.log('Admin layout - Current user:', user?.email)
-    if (user && !isAdminEmail(user.email)) {
+    if (!authLoading && !user) { router.replace('/login'); return }
+    if (authLoading || !user) return
+
+  if (user && !isAdminEmail(user.email)) {
       console.log('User is not admin, redirecting to login')
       router.push('/login')
     } else if (user && isAdminEmail(user.email)) {
@@ -75,7 +79,7 @@ export default function AdminLayout({
       fetchClients()
       fetchCampaigns()
     }
-  }, [user, router])
+  }, [user, router, authLoading])
   
   const fetchAgencies = async () => {
     const { data } = await supabase.from('agencies').select('*').order('name', { ascending: true })
@@ -247,6 +251,8 @@ export default function AdminLayout({
     }
   }
 
+  if (authLoading || !user) return <div className="min-h-screen flex items-center justify-center bg-white text-gray-600" role="status">Tikrinamas prisijungimas…</div>
+
   if (user && !isAdminEmail(user.email)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -259,35 +265,13 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="proof-admin">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <img
-                src="/Piksel-logo-juodas-2026.png"
-                alt="Piksel"
-                className="h-8 w-auto"
-              />
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <span className="text-gray-600">{user?.email}</span>
-              <button
-                onClick={handleSignOut}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <LogOut className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <header className="proof-header"><Link href="/admin" className="proof-brand"><img src="/Piksel-logo-juodas-2026.png" alt="Piksel" /><span>PHOTO PROOF</span></Link><div className="proof-account"><span>PIKSEL ADMIN</span><span>{user.email}</span><button onClick={handleSignOut} aria-label="Atsijungti" title="Atsijungti"><LogOut size={19} /></button></div></header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="proof-main">
         {/* Main content - Full Width */}
-        <div className="max-w-7xl mx-auto">
+        <div className="proof-content">
           <AdminModalsContext.Provider value={{
             showAgencyModal: () => setShowAgencyModal(true),
             showClientModal: (agencyId?: string) => {
@@ -308,14 +292,14 @@ export default function AdminLayout({
           <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0, 0, 0, 0.3)' }}>
             <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Naujas katalogas</h2>
+                <h2 className="text-xl font-bold text-gray-900">Nauja agentūra</h2>
                 <button onClick={() => setShowAgencyModal(false)} className="text-gray-400 hover:text-gray-600">
                   <X className="h-6 w-6" />
                 </button>
               </div>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Katalogo pavadinimas</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Agentūros pavadinimas</label>
                   <input
                     type="text"
                     value={agencyName}
@@ -323,7 +307,7 @@ export default function AdminLayout({
                     placeholder="Pvz. Open"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
-                  <p className="mt-2 text-xs text-gray-500">Bus sukurta unikali nuoroda katalogui</p>
+                  <p className="mt-2 text-xs text-gray-500">Bus sukurta vieša agentūros nuoroda</p>
                 </div>
                 <div className="flex space-x-3">
                   <button
@@ -331,7 +315,7 @@ export default function AdminLayout({
                     disabled={uploading}
                     className="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
                   >
-                    {uploading ? 'Kuriama...' : 'Sukurti katalogą'}
+                    {uploading ? 'Kuriama...' : 'Sukurti agentūrą'}
                   </button>
                   <button
                     onClick={() => setShowAgencyModal(false)}
@@ -373,13 +357,13 @@ export default function AdminLayout({
                 </div>
                 {!preselectedAgency && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Katalogas</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Agentūra</label>
                     <select
                       value={clientAgency}
                       onChange={(e) => setClientAgency(e.target.value)}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
-                      <option value="">Pasirinkite katalogą...</option>
+                      <option value="">Pasirinkite agentūrą...</option>
                       {agencies.map((agency) => (
                         <option key={agency.id} value={agency.id}>{agency.name}</option>
                       ))}
