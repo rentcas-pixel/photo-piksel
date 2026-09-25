@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   title: "Piksel Photo Proof",
   description: "Photo management system for Piksel clients",
   icons: {
-    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
+    icon: [{ url: "/favicon.svg?v=camera-1", type: "image/svg+xml" }],
   },
 };
 
