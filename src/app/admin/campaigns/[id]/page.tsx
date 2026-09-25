@@ -1,10 +1,12 @@
 'use client'
 
+import { createBrandedPhoto } from '@/lib/branded-photo'
+
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Campaign, Client, Photo } from '@/types/database'
-import { Download, Image as ImageIcon, DownloadCloud, Trash2, ChevronLeft, ChevronRight, Upload, X, Plus, Edit, Copy, Check } from 'lucide-react'
+import { Download, ArrowDownToLine, Image as ImageIcon, DownloadCloud, Trash2, ChevronLeft, ChevronRight, Upload, X, Plus, Edit, Copy, Check } from 'lucide-react'
 import JSZip from 'jszip'
 import Link from 'next/link'
 import { adminApiRequest } from '@/lib/admin-fetch'
@@ -229,13 +231,14 @@ export default function AdminCampaignDetailPage() {
   }
 
   const handleDownload = async (photo: PhotoWithCampaign) => {
+    if (downloadBusy.current) return
+    downloadBusy.current = true
+    setDownloadProgress(0)
     try {
-      const extension = photo.original_name.split('.').pop() || 'jpg'
+      const { blob, extension } = await createBrandedPhoto(photo.url)
       const uploadDate = new Date(photo.created_at).toISOString().split('T')[0]
       const newFilename = `Piksel_${client?.name}_${campaign?.name}_${uploadDate}.${extension}`
       
-      const response = await fetch(photo.url)
-      const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       
       const a = document.createElement('a')
@@ -245,11 +248,11 @@ export default function AdminCampaignDetailPage() {
       a.click()
       document.body.removeChild(a)
       
-      window.URL.revokeObjectURL(url)
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 30000)
     } catch (error) {
       console.error('Error downloading photo:', error)
       alert('Klaida atsisiunčiant nuotrauką')
-    }
+    } finally { downloadBusy.current = false; setDownloadProgress(null) }
   }
 
   const handleDownloadAll = async (selection: PhotoWithCampaign[] = photos) => {
@@ -262,13 +265,10 @@ export default function AdminCampaignDetailPage() {
       
       for (let i = 0; i < selection.length; i++) {
         const photo = selection[i]
-        const extension = photo.original_name.split('.').pop() || 'jpg'
+        const { blob, extension } = await createBrandedPhoto(photo.url)
         const uploadDate = new Date(photo.created_at).toISOString().split('T')[0]
         const newFilename = `Piksel_${client?.name}_${campaign?.name}_${uploadDate}_${i + 1}.${extension}`
         
-        const response = await fetch(photo.url)
-        if (!response.ok) throw new Error('Nuotrauka nepasiekiama')
-        const blob = await response.blob()
         zip.file(newFilename, blob)
         setDownloadProgress(Math.round((i + 1) / selection.length * 75))
       }
@@ -718,46 +718,21 @@ export default function AdminCampaignDetailPage() {
       {/* Photo Modal */}
       {selectedPhoto && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4"><div className="proof-thumbnails">{photos.map(photo => <button key={photo.id} aria-label={`Rodyti ${photo.original_name}`} aria-pressed={selectedPhoto.id === photo.id} onClick={() => setSelectedPhoto(photo)}><img src={photo.url} alt="" /></button>)}</div>
-          <div className="relative max-w-7xl max-h-full"><button className="absolute left-2 top-1/2 z-20 rounded-full bg-black/70 p-3 text-white" onClick={() => navigatePhoto(-1)} aria-label="Ankstesnė nuotrauka"><ChevronLeft /></button><button className="absolute right-2 top-1/2 z-20 rounded-full bg-black/70 p-3 text-white" onClick={() => navigatePhoto(1)} aria-label="Kita nuotrauka"><ChevronRight /></button>
-            <div className="absolute top-4 right-4 flex gap-2 z-10">
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  void handleDownload(selectedPhoto)
-                }}
-                className="p-3 bg-green-500 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
-                title="Atsisiųsti nuotrauką"
-              >
-                <Download className="h-6 w-6 text-white" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  void handleDeletePhoto(selectedPhoto.id)
-                }}
-                disabled={deletingPhotoId === selectedPhoto.id}
-                className="p-3 bg-red-600 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors disabled:opacity-50"
-                title="Ištrinti nuotrauką"
-              >
-                <Trash2 className="h-6 w-6 text-white" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setSelectedPhoto(null)}
-                className="p-3 bg-gray-700 bg-opacity-90 rounded-full hover:bg-opacity-100 transition-colors"
-                title="Uždaryti"
-              >
-                <X className="h-6 w-6 text-white" />
-              </button>
+          <div className="relative max-w-7xl max-h-full overflow-hidden rounded-lg bg-black"><button className="absolute left-2 top-1/2 z-20 rounded-full bg-black/70 p-3 text-white" onClick={() => navigatePhoto(-1)} aria-label="Ankstesnė nuotrauka"><ChevronLeft /></button><button className="absolute right-2 top-1/2 z-20 rounded-full bg-black/70 p-3 text-white" onClick={() => navigatePhoto(1)} aria-label="Kita nuotrauka"><ChevronRight /></button>
+            <div className="proof-admin-photo-bar" role="toolbar" aria-label="Nuotraukos valdymas">
+              <span className="proof-admin-photo-count" aria-live="polite">{photos.findIndex(photo => photo.id === selectedPhoto.id) + 1} / {photos.length}</span>
+              <img src="/Piksel-logo-baltas-2026.png" alt="Piksel" className="proof-admin-photo-logo" />
+              <div className="proof-admin-photo-actions">
+                <button type="button" disabled={downloadProgress !== null} onClick={() => void handleDownload(selectedPhoto)} aria-label="Atsisiųsti nuotrauką" title="Atsisiųsti nuotrauką"><ArrowDownToLine className="h-[14px] w-[14px]" /></button>
+                <button type="button" disabled={deletingPhotoId === selectedPhoto.id} onClick={() => void handleDeletePhoto(selectedPhoto.id)} aria-label="Ištrinti nuotrauką" title="Ištrinti nuotrauką" className="proof-admin-photo-delete"><Trash2 className="h-4 w-4" /></button>
+                <button type="button" onClick={() => setSelectedPhoto(null)} aria-label="Uždaryti" title="Uždaryti (ESC)"><X className="h-5 w-5" /></button>
+              </div>
             </div>
             <img
               onTouchStart={e => { touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }} onTouchEnd={e => { if (!touchStart.current) return; const dx = e.changedTouches[0].clientX - touchStart.current.x, dy = e.changedTouches[0].clientY - touchStart.current.y; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) navigatePhoto(dx < 0 ? 1 : -1); touchStart.current = null }}
               src={selectedPhoto.url}
               alt={selectedPhoto.original_name}
-              className="max-w-full max-h-[calc(100svh-180px)] object-contain rounded-lg"
+              className="block mx-auto max-w-full max-h-[max(100px,calc(100svh-264px))] max-sm:max-h-[max(100px,calc(100svh-300px))] object-contain rounded-b-lg"
             />
           </div>
         </div>

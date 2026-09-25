@@ -22,3 +22,11 @@
 .proof-admin button:disabled{cursor:not-allowed}.proof-admin :is(a,button,input,select,textarea):focus-visible{outline:2px solid #596579;outline-offset:3px}
 .proof-admin .fixed>.bg-white{max-height:calc(100svh - 32px);overflow:auto}.proof-admin .fixed.inset-0{overflow-y:auto}.proof-admin .border-dashed{background:#fafafa;border-color:#b5bcc3;padding:40px 20px}
 @media(max-width:700px){.proof-header{height:auto;min-height:85px;flex-wrap:wrap;padding:20px 0}.proof-account{gap:8px;font-size:12px;flex-wrap:wrap}.proof-account>span:first-child,.proof-brand span{display:none}.proof-page-heading{align-items:flex-start;flex-direction:column}.proof-toolbar{align-items:flex-start;flex-direction:column}.proof-search{width:100%}.proof-search input{width:100%}.proof-row{gap:10px;flex-wrap:wrap;padding-bottom:10px}.proof-entry{gap:12px;min-width:200px}.proof-folder{width:45px;height:45px}.proof-entry h2,.proof-admin .proof-list-title{font-size:24px}.proof-main{padding-top:24px}.proof-detail-heading h1{font-size:34px}.proof-detail-heading .h-10{height:auto;min-height:40px}.proof-stats{gap:40px}}
+
+.proof-admin-photo-bar{display:grid;grid-template-columns:minmax(148px,1fr) minmax(0,96px) minmax(148px,1fr);align-items:center;padding:20px;background:#000;color:#fff}
+.proof-admin-photo-count{justify-self:start;border:1px solid #ffffff33;border-radius:8px;padding:6px 12px;font-size:16px;font-weight:500;font-variant-numeric:tabular-nums;white-space:nowrap}
+.proof-admin-photo-logo{display:block;width:100%;max-width:96px;height:auto;justify-self:center}
+.proof-admin-photo-actions{display:flex;gap:8px;justify-self:end}
+.proof-admin-photo-actions button{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:10px;border:1px solid #ffffff33;background:#000;color:#fff;transition:background .15s}
+.proof-admin-photo-actions button:hover{background:#1a1a1a}.proof-admin-photo-actions button:disabled{opacity:.5}.proof-admin-photo-actions .proof-admin-photo-delete:hover{color:#fca5a5}
+@media(max-width:640px){.proof-admin-photo-bar{grid-template-columns:minmax(0,1fr) auto;row-gap:12px}.proof-admin-photo-logo{grid-column:1 / -1;grid-row:1;width:72px}.proof-admin-photo-count,.proof-admin-photo-actions{grid-row:2}}

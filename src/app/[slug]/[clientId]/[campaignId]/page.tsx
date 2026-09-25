@@ -1,5 +1,7 @@
 'use client'
 
+import { createBrandedPhoto } from '@/lib/branded-photo'
+
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -191,13 +193,10 @@ export default function CampaignPublicPage() {
     setDownloadProgress(0)
     try {
       
-      const extension = photo.original_name.split('.').pop() || 'jpg'
+      const { blob, extension } = await createBrandedPhoto(photo.url)
       const uploadDate = new Date(photo.created_at).toISOString().split('T')[0]
       const newFilename = `Piksel_${client?.name}_${campaign?.name}_${uploadDate}.${extension}`
       
-      const response = await fetch(photo.url)
-      if (!response.ok) throw new Error('Nuotrauka nepasiekiama')
-      const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       
       const a = document.createElement('a')
@@ -223,10 +222,8 @@ export default function CampaignPublicPage() {
       const zip = new JSZip()
       for (let i = 0; i < selection.length; i++) {
         const photo = selection[i]
-        const response = await fetch(photo.url)
-        if (!response.ok) throw new Error('Nuotrauka nepasiekiama')
-        const extension = photo.original_name.split('.').pop() || 'jpg'
-        zip.file(`Piksel_${i + 1}_${photo.id}.${extension}`, await response.blob())
+        const { blob, extension } = await createBrandedPhoto(photo.url)
+        zip.file(`Piksel_${i + 1}_${photo.id}.${extension}`, blob)
         setDownloadProgress(Math.round((i + 1) / selection.length * 75))
       }
       const blob = await zip.generateAsync({ type: 'blob' }, meta => setDownloadProgress(Math.round(75 + meta.percent / 4)))
