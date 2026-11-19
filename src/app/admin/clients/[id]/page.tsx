@@ -20,12 +20,12 @@ export default function AdminClientDetailPage() {
   const [newCampaignName, setNewCampaignName] = useState('')
   const [newCampaignDescription, setNewCampaignDescription] = useState('')
   const [campaignPhotoCounts, setCampaignPhotoCounts] = useState<Record<string, number>>({})
+  const [photoCountsStatus, setPhotoCountsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   useEffect(() => {
     if (clientId) {
       fetchClient()
       fetchCampaigns()
-      fetchPhotoCounts()
     }
   }, [clientId])
 
@@ -63,6 +63,7 @@ export default function AdminClientDetailPage() {
   }
 
   const fetchCampaigns = async () => {
+    setPhotoCountsStatus('loading')
     try {
       const { data, error } = await supabase
         .from('campaigns')
@@ -72,29 +73,35 @@ export default function AdminClientDetailPage() {
 
       if (error) {
         console.error('Error fetching campaigns:', error)
+        setPhotoCountsStatus('error')
       } else {
         setCampaigns(data || [])
+        void fetchPhotoCounts(data || [])
       }
     } catch (error) {
       console.error('Error:', error)
+      setPhotoCountsStatus('error')
     }
   }
 
-  const fetchPhotoCounts = async () => {
+  const fetchPhotoCounts = async (items: Campaign[]) => {
+    setPhotoCountsStatus('loading')
     try {
-      const { data: photos } = await supabase
-        .from('photos')
-        .select('campaign_id')
+      const counts = await Promise.all(items.map(async campaign => {
+        const { count, error } = await supabase
+          .from('photos')
+          .select('id', { count: 'exact', head: true })
+          .eq('campaign_id', campaign.id)
 
-      if (photos) {
-        const counts: Record<string, number> = {}
-        photos.forEach(photo => {
-          counts[photo.campaign_id] = (counts[photo.campaign_id] || 0) + 1
-        })
-        setCampaignPhotoCounts(counts)
-      }
+        if (error) throw error
+        if (count === null) throw new Error('Photo count was not returned')
+        return [campaign.id, count] as const
+      }))
+      setCampaignPhotoCounts(Object.fromEntries(counts))
+      setPhotoCountsStatus('ready')
     } catch (error) {
       console.error('Error fetching photo counts:', error)
+      setPhotoCountsStatus('error')
     }
   }
 
@@ -164,7 +171,6 @@ export default function AdminClientDetailPage() {
       }
 
       fetchCampaigns()
-      fetchPhotoCounts()
     } catch (error) {
       console.error('Error:', error)
       alert('Klaida trinant kampaniją')
@@ -267,9 +273,12 @@ export default function AdminClientDetailPage() {
                       </p>
                     ) : null}
                   </div>
-                  <span className="flex items-center gap-1.5 text-sm text-gray-600 tabular-nums shrink-0">
+                  <span
+                    className="flex items-center gap-1.5 text-sm text-gray-600 tabular-nums shrink-0"
+                    title={photoCountsStatus === 'error' ? 'Nepavyko gauti nuotraukų skaičiaus' : 'Nuotraukų skaičius'}
+                  >
                     <ImageIcon className="h-4 w-4 text-gray-400" aria-hidden />
-                    {campaignPhotoCounts[campaign.id] || 0}
+                    {photoCountsStatus === 'ready' ? campaignPhotoCounts[campaign.id] ?? '—' : '—'}
                   </span>
                   <ChevronRight className="h-5 w-5 text-gray-300 group-hover:text-indigo-500 shrink-0 transition-colors" aria-hidden />
                 </Link>
