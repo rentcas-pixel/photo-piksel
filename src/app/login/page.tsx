@@ -40,16 +40,13 @@ export default function LoginPage() {
         return
       }
 
-      if (!data || !data.user) {
+      if (!data?.user || !data.session?.access_token) {
         console.error('No user data returned')
         setError('Nepavyko gauti vartotojo duomenų')
         setLoading(false)
         return
       }
 
-      // Store user in localStorage
-      localStorage.setItem('mock-user', JSON.stringify(data.user))
-      
       // Redirect admin users to admin panel
       
       if (isAdminEmail(data.user.email)) {

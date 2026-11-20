@@ -24,66 +24,63 @@ export const useAuth = () => {
   return context
 }
 
+function clearLegacyUser() {
+  try {
+    localStorage.removeItem('mock-user')
+  } catch {
+    // A blocked browser storage must not turn an old user marker into a session.
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
 
   useEffect(() => {
-    // Get initial session
+    let active = true
+    let authChanged = false
+    clearLegacyUser()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        authChanged = true
+        if (!active) return
+        setUser(session?.access_token ? session.user : null)
+        setLoading(false)
+      }
+    )
+
     const getInitialSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession()
-        
-        // Jei nėra sesijos, patikrinti localStorage
-        if (!session) {
-          const mockUser = localStorage.getItem('mock-user')
-          if (mockUser) {
-            setUser(JSON.parse(mockUser))
-          } else {
-            setUser(null)
-          }
-        } else {
-          setUser(session.user)
+        if (active && !authChanged) {
+          setUser(!error && session?.access_token ? session.user : null)
         }
-      } catch (error) {
-        // Check localStorage for mock user
-        const mockUser = localStorage.getItem('mock-user')
-        if (mockUser) {
-          setUser(JSON.parse(mockUser))
-        } else {
+      } catch {
+        if (active && !authChanged) {
           setUser(null)
         }
+      } finally {
+        if (active) setLoading(false)
       }
-      setLoading(false)
     }
 
-    getInitialSession()
+    void getInitialSession()
 
-    // Listen for auth changes
-    try {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          setUser(session?.user ?? null)
-          setLoading(false)
-        }
-      )
-
-      return () => subscription.unsubscribe()
-    } catch (error) {
-      console.log('Mock mode - no auth state listener')
-      setLoading(false)
+    return () => {
+      active = false
+      subscription.unsubscribe()
     }
   }, [])
 
   const signOut = async () => {
     try {
       await supabase.auth.signOut()
-    } catch (error) {
-      // Mock mode - just clear localStorage
-      localStorage.removeItem('mock-user')
+    } finally {
+      clearLegacyUser()
+      setUser(null)
     }
-    setUser(null)
   }
 
   const value = {

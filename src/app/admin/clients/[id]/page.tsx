@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { adminApiRequest } from '@/lib/admin-fetch'
 import { Client, Campaign } from '@/types/database'
 import { Folder, ChevronRight, Plus, Trash2, Image as ImageIcon } from 'lucide-react'
 import Link from 'next/link'
@@ -111,17 +112,10 @@ export default function AdminClientDetailPage() {
     if (!newCampaignName.trim()) return
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        alert('Sesija pasibaigė. Prisijunkite iš naujo.')
-        return
-      }
-
-      const res = await fetch('/api/campaigns', {
+      const result = await adminApiRequest('/api/campaigns', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           client_id: clientId,
@@ -130,11 +124,8 @@ export default function AdminClientDetailPage() {
         }),
       })
 
-      const json = await res.json().catch(() => ({}))
-
-      if (!res.ok) {
-        console.error('Error creating campaign:', json)
-        alert((json as { error?: string }).error || 'Klaida kuriant kampaniją')
+      if (!result.ok) {
+        alert(result.error)
         return
       }
 
@@ -152,21 +143,11 @@ export default function AdminClientDetailPage() {
     if (!confirm('Ar tikrai norite ištrinti šią kampaniją? Bus ištrintos ir visos nuotraukos!')) return
 
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) {
-        alert('Sesija pasibaigė. Prisijunkite iš naujo.')
-        return
-      }
-
-      const res = await fetch(`/api/campaigns/${campaignId}`, {
+      const result = await adminApiRequest(`/api/campaigns/${campaignId}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${session.access_token}` },
       })
-      const json = await res.json().catch(() => ({}))
-
-      if (!res.ok) {
-        console.error('Error deleting campaign:', json)
-        alert((json as { error?: string }).error || 'Klaida trinant kampaniją')
+      if (!result.ok) {
+        alert(result.error)
         return
       }
 
